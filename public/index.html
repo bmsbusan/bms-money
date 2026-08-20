@@ -89,6 +89,11 @@
         <label class="field-label">입금일
           <input id="newPaidDate" type="date" />
         </label>
+        <label class="field-label">입금 통장
+          <select id="newBankAccount">
+            <option value="">통장 선택</option>
+          </select>
+        </label>
       </div>
       <div class="add-form-actions">
         <button id="saveNewBtn" class="btn btn-primary">저장</button>
@@ -108,6 +113,7 @@
             <th class="col-check">품의</th>
             <th class="col-check">입금</th>
             <th class="col-date">입금일</th>
+            <th class="col-bank">입금 통장</th>
             <th class="col-manage">관리</th>
           </tr>
         </thead>
@@ -125,6 +131,9 @@
       <nav class="subtab-bar">
         <button id="historyModeMonthBtn" class="subtab-btn subtab-active" data-mode="month">월별</button>
         <button id="historyModeYearBtn" class="subtab-btn" data-mode="year">연도별</button>
+        <select id="historyFilterSite" class="history-site-filter">
+          <option value="">전체 현장</option>
+        </select>
       </nav>
       <section class="table-wrap">
         <table id="historyTable">

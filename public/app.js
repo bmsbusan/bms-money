@@ -4,6 +4,14 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+  // 입금 통장 목록 (고정)
+  const BANK_ACCOUNTS = [
+    "비엠에스코리아부산지사 통장 (부산 101-2094-3567-03)",
+    "정우이엔지 통장 (부산 113-2020-6145-00)",
+    "박은희 B통장 (부산 112-2254-7975-09)",
+    "이영웅 B통장 (부산 112-2357-7881-04)",
+  ];
+
   const loginView = $("#loginView");
   const appView = $("#appView");
   const loginForm = $("#loginForm");
@@ -25,6 +33,7 @@
   const newBilled = $("#newBilled");
   const newPaid = $("#newPaid");
   const newPaidDate = $("#newPaidDate");
+  const newBankAccount = $("#newBankAccount");
   const saveNewBtn = $("#saveNewBtn");
   const cancelNewBtn = $("#cancelNewBtn");
   const addError = $("#addError");
@@ -38,6 +47,7 @@
   const historyModeMonthBtn = $("#historyModeMonthBtn");
   const historyModeYearBtn = $("#historyModeYearBtn");
   const historyPeriodHeader = $("#historyPeriodHeader");
+  const historyFilterSite = $("#historyFilterSite");
 
   const recordsBody = $("#recordsBody");
   const emptyMsg = $("#emptyMsg");
@@ -68,6 +78,14 @@
   let sortDir = "asc"; // "asc" | "desc"
 
   const won = (n) => (Number(n) || 0).toLocaleString("ko-KR") + "원";
+
+  function bankAccountOptionsHtml(selected) {
+    const opts = BANK_ACCOUNTS.map(
+      (b) => `<option value="${escapeHtml(b)}" ${b === selected ? "selected" : ""}>${escapeHtml(b)}</option>`
+    ).join("");
+    return `<option value="" ${!selected ? "selected" : ""}>통장 선택</option>${opts}`;
+  }
+  newBankAccount.innerHTML = bankAccountOptionsHtml("");
 
   async function api(path, options = {}) {
     const res = await fetch(path, {
@@ -181,10 +199,13 @@
     const opts = sites.map((s) => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join("");
     const prevFilter = filterSite.value;
     const prevNew = newSite.value;
+    const prevHistoryFilter = historyFilterSite.value;
     filterSite.innerHTML = `<option value="">전체 현장</option>${opts}`;
     newSite.innerHTML = `<option value="">현장 선택</option>${opts}`;
+    historyFilterSite.innerHTML = `<option value="">전체 현장</option>${opts}`;
     if (sites.some((s) => s.name === prevFilter)) filterSite.value = prevFilter;
     if (sites.some((s) => s.name === prevNew)) newSite.value = prevNew;
+    if (sites.some((s) => s.name === prevHistoryFilter)) historyFilterSite.value = prevHistoryFilter;
   }
 
   function renderSiteModalList() {
@@ -357,6 +378,9 @@
         <td class="col-date">
           <input type="date" class="edit-input" data-action="change-date" data-id="${r.id}" value="${r.paid_date || ""}" />
         </td>
+        <td class="col-bank">
+          <select class="edit-input" data-action="change-bank" data-id="${r.id}">${bankAccountOptionsHtml(r.bank_account)}</select>
+        </td>
         <td class="col-manage">
           <span class="row-actions">
             <button class="btn btn-ghost btn-sm" data-action="edit" data-id="${r.id}">수정</button>
@@ -383,6 +407,7 @@
           <input type="checkbox" data-edit="paid" ${r.paid ? "checked" : ""} />
         </td>
         <td class="col-date"><input class="edit-input" type="date" data-edit="paid_date" value="${r.paid_date || ""}" /></td>
+        <td class="col-bank"><select class="edit-input" data-edit="bank_account">${bankAccountOptionsHtml(r.bank_account)}</select></td>
         <td class="col-manage">
           <span class="row-actions">
             <button class="btn btn-primary btn-sm" data-action="save-edit" data-id="${r.id}">저장</button>
@@ -403,6 +428,8 @@
       await patchRecord(id, { paid: e.target.checked });
     } else if (action === "change-date") {
       await patchRecord(id, { paid_date: e.target.value });
+    } else if (action === "change-bank") {
+      await patchRecord(id, { bank_account: e.target.value });
     }
   });
 
@@ -427,6 +454,7 @@
         billed: row.querySelector('[data-edit="billed"]').checked,
         paid: row.querySelector('[data-edit="paid"]').checked,
         paid_date: row.querySelector('[data-edit="paid_date"]').value || null,
+        bank_account: row.querySelector('[data-edit="bank_account"]').value || "",
       };
       try {
         await patchRecord(id, patch, false);
@@ -479,6 +507,7 @@
     newBilled.checked = false;
     newPaid.checked = false;
     newPaidDate.value = "";
+    newBankAccount.value = "";
     addError.textContent = "";
   }
 
@@ -497,6 +526,7 @@
           billed: newBilled.checked,
           paid: newPaid.checked,
           paid_date: newPaidDate.value || null,
+          bank_account: newBankAccount.value || "",
         }),
       });
       addForm.classList.add("hidden");
@@ -525,9 +555,16 @@
   }
   historyModeMonthBtn.addEventListener("click", () => switchHistoryMode("month"));
   historyModeYearBtn.addEventListener("click", () => switchHistoryMode("year"));
+  historyFilterSite.addEventListener("change", () => {
+    expandedMonths.clear();
+    renderHistory();
+  });
 
   function renderHistory() {
-    if (historyRows.length === 0) {
+    const siteFilter = historyFilterSite.value;
+    const filteredRows = siteFilter ? historyRows.filter((r) => r.site_name === siteFilter) : historyRows;
+
+    if (filteredRows.length === 0) {
       historyBody.innerHTML = "";
       historyEmptyMsg.classList.remove("hidden");
       return;
@@ -536,7 +573,7 @@
 
     // 월별 또는 연도별로 묶기 (연도별은 월별 데이터를 다시 합산)
     const byPeriod = new Map();
-    for (const row of historyRows) {
+    for (const row of filteredRows) {
       const m = row.month || "미상";
       const key = historyMode === "year" ? m.slice(0, 4) || "미상" : m;
       if (!byPeriod.has(key)) {
@@ -544,16 +581,16 @@
       }
       const bucket = byPeriod.get(key);
       bucket.count += row.count;
-      bucket.billed_total += row.billed_total || 0;
+      // 청구금액 합계는 "품의 올림" 체크 여부와 상관없이, 등록된 전체 비용을 기준으로 집계합니다.
+      bucket.billed_total += row.cost_total || 0;
       bucket.paid_total += row.paid_total || 0;
 
       // 연도별일 때는 같은 현장이 여러 달에 걸쳐 나올 수 있으므로 현장 기준으로 다시 합산
       const s = bucket.sitesMap.get(row.site_name) || {
-        site_name: row.site_name, count: 0, billed_total: 0, billed_count: 0, paid_total: 0, paid_count: 0,
+        site_name: row.site_name, count: 0, billed_total: 0, paid_total: 0, paid_count: 0,
       };
       s.count += row.count;
-      s.billed_total += row.billed_total || 0;
-      s.billed_count += row.billed_count || 0;
+      s.billed_total += row.cost_total || 0;
       s.paid_total += row.paid_total || 0;
       s.paid_count += row.paid_count || 0;
       bucket.sitesMap.set(row.site_name, s);
@@ -574,7 +611,7 @@
                 <td></td>
                 <td class="site-detail-name">${escapeHtml(s.site_name)}</td>
                 <td class="col-cost">${s.count}건</td>
-                <td class="col-cost">${won(s.billed_total)} (${s.billed_count}건)</td>
+                <td class="col-cost">${won(s.billed_total)} (${s.count}건)</td>
                 <td class="col-cost">${won(s.paid_total)} (${s.paid_count}건)</td>
                 <td class="col-cost">${won((s.billed_total || 0) - (s.paid_total || 0))}</td>
               </tr>`
@@ -616,9 +653,9 @@
       return;
     }
 
-    // 월 행 클릭 -> 내역 목록 탭으로 이동해서 해당 월로 필터링
+    // 월 행 클릭 -> 내역 목록 탭으로 이동해서 해당 월(및 현장 필터 중이면 그 현장)로 필터링
     filterMonth.value = period;
-    filterSite.value = "";
+    filterSite.value = historyFilterSite.value || "";
     switchTab("list");
     loadRecords();
   });
