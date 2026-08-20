@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS sites (
 CREATE TABLE IF NOT EXISTS records (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   site_name TEXT NOT NULL,
+  work_date TEXT,                      -- 작업 날짜 YYYY-MM-DD (월별 히스토리 집계 기준)
   content TEXT DEFAULT '',
   cost INTEGER NOT NULL DEFAULT 0,
   billed INTEGER NOT NULL DEFAULT 0,   -- 청구 여부 (0/1)
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS records (
 
 CREATE INDEX IF NOT EXISTS idx_records_site ON records(site_name);
 CREATE INDEX IF NOT EXISTS idx_records_created ON records(created_at);
+CREATE INDEX IF NOT EXISTS idx_records_work_date ON records(work_date);
 
 -- 초기 현장 목록 (요청 주신 22개 현장)
 INSERT OR IGNORE INTO sites (name, sort_order) VALUES
