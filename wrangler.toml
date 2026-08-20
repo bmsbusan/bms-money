@@ -13,4 +13,4 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "hyunjang-payment-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "34677038-d8a8-432f-a81e-3044c909d9b8"
