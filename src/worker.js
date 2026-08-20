@@ -93,6 +93,7 @@ function rowToRecord(row) {
   return {
     id: row.id,
     site_name: row.site_name,
+    work_date: row.work_date || null,
     content: row.content || "",
     cost: row.cost,
     billed: !!row.billed,
@@ -177,10 +178,10 @@ async function handleGetRecords(request, env) {
     binds.push(site);
   }
   if (month) {
-    query += " AND strftime('%Y-%m', created_at) = ?";
+    query += " AND strftime('%Y-%m', COALESCE(work_date, created_at)) = ?";
     binds.push(month);
   }
-  query += " ORDER BY paid ASC, created_at DESC";
+  query += " ORDER BY paid ASC, COALESCE(work_date, created_at) DESC, id DESC";
 
   const stmt = env.DB.prepare(query).bind(...binds);
   const { results } = await stmt.all();
@@ -191,6 +192,7 @@ async function handleCreateRecord(request, env) {
   const body = await readJson(request);
   if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
   const site_name = typeof body.site_name === "string" ? body.site_name.trim() : "";
+  const work_date = typeof body.work_date === "string" && body.work_date ? body.work_date : null;
   const content = typeof body.content === "string" ? body.content.trim() : "";
   const cost = Number.isFinite(Number(body.cost)) ? Math.round(Number(body.cost)) : 0;
   const billed = toBool(body.billed) ? 1 : 0;
@@ -198,12 +200,13 @@ async function handleCreateRecord(request, env) {
   const paid_date = typeof body.paid_date === "string" && body.paid_date ? body.paid_date : null;
 
   if (!site_name) return badRequest("현장명을 선택해주세요.");
+  if (!work_date) return badRequest("작업 날짜를 선택해주세요.");
 
   const result = await env.DB.prepare(
-    `INSERT INTO records (site_name, content, cost, billed, paid, paid_date, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+    `INSERT INTO records (site_name, work_date, content, cost, billed, paid, paid_date, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
   )
-    .bind(site_name, content, cost, billed, paid, paid_date)
+    .bind(site_name, work_date, content, cost, billed, paid, paid_date)
     .run();
 
   return json({ ok: true, id: result.meta.last_row_id });
@@ -219,6 +222,10 @@ async function handleUpdateRecord(id, request, env) {
   if (typeof body.site_name === "string") {
     fields.push("site_name = ?");
     binds.push(body.site_name.trim());
+  }
+  if (body.work_date !== undefined) {
+    fields.push("work_date = ?");
+    binds.push(body.work_date || null);
   }
   if (typeof body.content === "string") {
     fields.push("content = ?");
@@ -256,6 +263,25 @@ async function handleUpdateRecord(id, request, env) {
 async function handleDeleteRecord(id, env) {
   await env.DB.prepare("DELETE FROM records WHERE id = ?").bind(id).run();
   return json({ ok: true });
+}
+
+async function handleMonthlySummary(env) {
+  // 월 + 현장별로 집계한 뒤, 프론트에서 월별 합계 / 현장별 상세로 다시 묶어서 보여줍니다.
+  const { results } = await env.DB.prepare(
+    `SELECT
+       strftime('%Y-%m', COALESCE(work_date, created_at)) AS month,
+       site_name,
+       COUNT(*) AS count,
+       SUM(cost) AS cost_total,
+       SUM(CASE WHEN billed = 1 THEN cost ELSE 0 END) AS billed_total,
+       SUM(CASE WHEN billed = 1 THEN 1 ELSE 0 END) AS billed_count,
+       SUM(CASE WHEN paid = 1 THEN cost ELSE 0 END) AS paid_total,
+       SUM(CASE WHEN paid = 1 THEN 1 ELSE 0 END) AS paid_count
+     FROM records
+     GROUP BY month, site_name
+     ORDER BY month DESC, site_name ASC`
+  ).all();
+  return json({ rows: results });
 }
 
 // ---- 메인 fetch 핸들러 ----
@@ -309,6 +335,10 @@ export default {
       }
       if (recordMatch && method === "DELETE") {
         return await handleDeleteRecord(Number(recordMatch[1]), env);
+      }
+
+      if (path === "/api/monthly-summary" && method === "GET") {
+        return await handleMonthlySummary(env);
       }
 
       return json({ error: "Not Found" }, { status: 404 });
