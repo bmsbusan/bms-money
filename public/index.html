@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>현장 청구/입금 체크</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+  <!-- 로그인 화면 -->
+  <div id="loginView" class="login-wrap">
+    <form id="loginForm" class="login-box">
+      <h1>현장 청구/입금 체크</h1>
+      <p class="login-sub">비밀번호를 입력하고 접속하세요</p>
+      <input id="loginPassword" type="password" placeholder="비밀번호" autocomplete="current-password" required />
+      <button type="submit">로그인</button>
+      <p id="loginError" class="error-msg"></p>
+    </form>
+  </div>
+
+  <!-- 메인 화면 -->
+  <div id="appView" class="app-wrap hidden">
+    <header class="app-header">
+      <h1>현장 청구/입금 체크</h1>
+      <div class="header-actions">
+        <span id="lastSync" class="last-sync"></span>
+        <button id="siteManageBtn" class="btn btn-ghost">현장 관리</button>
+        <button id="logoutBtn" class="btn btn-ghost">로그아웃</button>
+      </div>
+    </header>
+
+    <section class="summary-cards">
+      <div class="card">
+        <div class="card-label">전체 건수</div>
+        <div class="card-value" id="sumTotal">0</div>
+      </div>
+      <div class="card card-warn">
+        <div class="card-label">청구 대기</div>
+        <div class="card-value" id="sumUnbilled">0</div>
+      </div>
+      <div class="card card-warn">
+        <div class="card-label">입금 대기</div>
+        <div class="card-value" id="sumUnpaid">0</div>
+      </div>
+      <div class="card card-good">
+        <div class="card-label">입금 완료 합계</div>
+        <div class="card-value" id="sumPaidCost">0원</div>
+      </div>
+    </section>
+
+    <section class="toolbar">
+      <div class="filters">
+        <select id="filterSite">
+          <option value="">전체 현장</option>
+        </select>
+        <select id="filterMonth">
+          <option value="">전체 기간</option>
+        </select>
+        <button id="filterResetBtn" class="btn btn-ghost">초기화</button>
+      </div>
+      <button id="addRecordBtn" class="btn btn-primary">+ 새 내역 추가</button>
+    </section>
+
+    <!-- 새 내역 추가 폼 -->
+    <section id="addForm" class="add-form hidden">
+      <div class="add-form-grid">
+        <select id="newSite" required>
+          <option value="">현장 선택</option>
+        </select>
+        <input id="newContent" type="text" placeholder="내용 입력" />
+        <input id="newCost" type="number" placeholder="비용 입력 (원)" min="0" />
+        <label class="chk"><input id="newBilled" type="checkbox" /> 청구함</label>
+        <label class="chk"><input id="newPaid" type="checkbox" /> 입금됨</label>
+        <input id="newPaidDate" type="date" />
+      </div>
+      <div class="add-form-actions">
+        <button id="saveNewBtn" class="btn btn-primary">저장</button>
+        <button id="cancelNewBtn" class="btn btn-ghost">취소</button>
+      </div>
+      <p id="addError" class="error-msg"></p>
+    </section>
+
+    <section class="table-wrap">
+      <table id="recordsTable">
+        <thead>
+          <tr>
+            <th class="col-site">현장명</th>
+            <th class="col-content">내용</th>
+            <th class="col-cost">비용</th>
+            <th class="col-check">청구</th>
+            <th class="col-check">입금</th>
+            <th class="col-date">입금일</th>
+            <th class="col-manage">관리</th>
+          </tr>
+        </thead>
+        <tbody id="recordsBody">
+        </tbody>
+      </table>
+      <p id="emptyMsg" class="empty-msg hidden">등록된 내역이 없습니다.</p>
+    </section>
+  </div>
+
+  <!-- 현장 관리 모달 -->
+  <div id="siteModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>현장 관리</h2>
+      <div class="site-add-row">
+        <input id="siteNewName" type="text" placeholder="새 현장명 입력" />
+        <button id="siteAddBtn" class="btn btn-primary">추가</button>
+      </div>
+      <ul id="siteList" class="site-list"></ul>
+      <p id="siteError" class="error-msg"></p>
+      <div class="modal-actions">
+        <button id="siteModalCloseBtn" class="btn btn-ghost">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

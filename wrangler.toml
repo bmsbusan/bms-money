@@ -1,0 +1,16 @@
+name = "hyunjang-payment-tracker"
+main = "src/worker.js"
+compatibility_date = "2024-09-23"
+
+# 정적 파일(로그인/화면 HTML, CSS, JS)을 서빙하는 설정입니다.
+# public 폴더 안의 파일들이 그대로 서빙되고, /api/ 로 시작하는 요청만 worker.js 코드가 처리합니다.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# D1 데이터베이스 연결 설정입니다.
+# 아래 database_id 값은 README 안내에 따라 `npx wrangler d1 create` 실행 후 나오는 값으로 반드시 교체해야 합니다.
+[[d1_databases]]
+binding = "DB"
+database_name = "hyunjang-payment-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"

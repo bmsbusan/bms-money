@@ -1,0 +1,14 @@
+{
+  "name": "hyunjang-payment-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "현장별 월별 청구/입금 체크 웹앱 (Cloudflare Workers + D1)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute hyunjang-payment-db --remote --file=./schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

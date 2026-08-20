@@ -1,0 +1,231 @@
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --border: #e2e5ea;
+  --text: #1f2430;
+  --text-muted: #6b7280;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --danger: #dc2626;
+  --warn-bg: #fff7e6;
+  --warn-text: #a15c00;
+  --good-bg: #e8f7ee;
+  --good-text: #1a7f4b;
+  --paid-row-bg: #eafaf1;
+  --paid-row-border: #b7ecd0;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Pretendard", "Malgun Gothic", -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.hidden { display: none !important; }
+
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 17px; margin: 0 0 12px; }
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 16px;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { background: #f0f1f3; }
+.btn-danger { background: #fdecec; color: var(--danger); border: 1px solid #f6c8c8; }
+.btn-danger:hover { background: #fbdada; }
+.btn-sm { padding: 5px 10px; font-size: 12.5px; }
+
+input[type="text"], input[type="number"], input[type="password"], input[type="date"], select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+}
+
+/* ---------- 로그인 화면 ---------- */
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.login-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+  box-shadow: 0 4px 18px rgba(20, 20, 30, 0.06);
+}
+.login-sub { color: var(--text-muted); font-size: 13.5px; margin: 8px 0 20px; }
+.login-box input { width: 100%; margin-bottom: 12px; }
+.login-box button { width: 100%; }
+
+.error-msg { color: var(--danger); font-size: 13px; min-height: 18px; margin: 8px 0 0; }
+
+/* ---------- 앱 레이아웃 ---------- */
+.app-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.last-sync { font-size: 12px; color: var(--text-muted); margin-right: 4px; }
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.card-label { font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; }
+.card-value { font-size: 20px; font-weight: 700; }
+.card-warn .card-value { color: var(--warn-text); }
+.card-good .card-value { color: var(--good-text); }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.filters { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.add-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.add-form-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 2fr 1fr auto auto 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.add-form-grid input, .add-form-grid select { width: 100%; }
+.chk { display: flex; align-items: center; gap: 6px; font-size: 13.5px; white-space: nowrap; }
+.add-form-actions { margin-top: 12px; display: flex; gap: 8px; }
+
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+table { width: 100%; border-collapse: collapse; min-width: 760px; }
+thead th {
+  text-align: left;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+  white-space: nowrap;
+}
+tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr.paid-row { background: var(--paid-row-bg); }
+tbody tr.paid-row td { border-bottom: 1px solid var(--paid-row-border); }
+
+.col-cost { text-align: right; }
+td.col-cost { text-align: right; font-variant-numeric: tabular-nums; }
+.col-check { text-align: center; }
+td.col-check { text-align: center; }
+.col-manage { text-align: right; }
+td.col-manage { text-align: right; white-space: nowrap; }
+
+.content-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.site-badge {
+  display: inline-block;
+  font-weight: 600;
+}
+
+.row-actions { display: inline-flex; gap: 6px; }
+
+.edit-input { width: 100%; padding: 6px 8px; font-size: 13.5px; }
+
+.empty-msg { text-align: center; color: var(--text-muted); padding: 30px 0; }
+
+/* ---------- 모달 ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 30, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 50;
+}
+.modal-box {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 22px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.site-add-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.site-add-row input { flex: 1; }
+.site-list { list-style: none; margin: 0; padding: 0; }
+.site-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.site-list li:last-child { border-bottom: none; }
+.modal-actions { margin-top: 16px; text-align: right; }
+
+@media (max-width: 720px) {
+  .summary-cards { grid-template-columns: repeat(2, 1fr); }
+  .add-form-grid { grid-template-columns: 1fr 1fr; }
+}

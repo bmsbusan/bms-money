@@ -1,0 +1,47 @@
+-- 현장 목록 테이블
+CREATE TABLE IF NOT EXISTS sites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+-- 청구/입금 내역 테이블
+CREATE TABLE IF NOT EXISTS records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site_name TEXT NOT NULL,
+  content TEXT DEFAULT '',
+  cost INTEGER NOT NULL DEFAULT 0,
+  billed INTEGER NOT NULL DEFAULT 0,   -- 청구 여부 (0/1)
+  paid INTEGER NOT NULL DEFAULT 0,     -- 입금 여부 (0/1)
+  paid_date TEXT,                      -- 입금일 YYYY-MM-DD
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_records_site ON records(site_name);
+CREATE INDEX IF NOT EXISTS idx_records_created ON records(created_at);
+
+-- 초기 현장 목록 (요청 주신 22개 현장)
+INSERT OR IGNORE INTO sites (name, sort_order) VALUES
+  ('샤인빌딩', 1),
+  ('예담빌딩', 2),
+  ('암산빌딩', 3),
+  ('오션테라스', 4),
+  ('반도유보라', 5),
+  ('포레나1차', 6),
+  ('포레나2차', 7),
+  ('큐엠시네마타워', 8),
+  ('동춘빌딩', 9),
+  ('태화빌딩', 10),
+  ('디오', 11),
+  ('메디플러스', 12),
+  ('남문시장', 13),
+  ('베스아이하늘', 14),
+  ('충렬지음', 15),
+  ('사상경보센트리안', 16),
+  ('포르투나', 17),
+  ('어반펠리체', 18),
+  ('지산오차드힐', 19),
+  ('송도타워', 20),
+  ('창원비룡1,2차', 21),
+  ('범일골드빌', 22);
