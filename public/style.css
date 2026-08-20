@@ -217,6 +217,13 @@ thead th {
   padding: 12px 14px;
   white-space: nowrap;
 }
+thead th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+thead th.sortable:hover { color: var(--text); }
+thead th.sortable.sort-active { color: var(--primary); font-weight: 700; }
+.sort-arrow { display: inline-block; width: 10px; margin-left: 2px; }
 tbody td {
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);

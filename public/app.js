@@ -2,6 +2,7 @@
   "use strict";
 
   const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
   const loginView = $("#loginView");
   const appView = $("#appView");
@@ -40,6 +41,7 @@
 
   const recordsBody = $("#recordsBody");
   const emptyMsg = $("#emptyMsg");
+  const sortableHeaders = $$("#recordsTable thead th.sortable");
 
   const sumTotal = $("#sumTotal");
   const sumUnbilled = $("#sumUnbilled");
@@ -62,6 +64,8 @@
   let historyRows = [];
   let expandedMonths = new Set();
   let historyMode = "month"; // "month" | "year"
+  let sortKey = null; // null | "site_name" | "work_date"
+  let sortDir = "asc"; // "asc" | "desc"
 
   const won = (n) => (Number(n) || 0).toLocaleString("ko-KR") + "원";
 
@@ -278,6 +282,49 @@
     sumPaidCost.textContent = won(paidCostSum);
   }
 
+  function sortedRecords() {
+    if (!sortKey) return records; // 정렬 안 함 -> 서버 기본 순서(입금 대기 먼저, 최신순) 그대로
+    const dir = sortDir === "desc" ? -1 : 1;
+    return [...records].sort((a, b) => {
+      let av = a[sortKey] || "";
+      let bv = b[sortKey] || "";
+      if (sortKey === "site_name") {
+        return av.localeCompare(bv, "ko") * dir;
+      }
+      // work_date: "YYYY-MM-DD" 문자열이라 그대로 비교 가능. 값이 없으면 항상 뒤로 보냄.
+      if (!av && !bv) return 0;
+      if (!av) return 1;
+      if (!bv) return -1;
+      return av < bv ? -1 * dir : av > bv ? 1 * dir : 0;
+    });
+  }
+
+  function updateSortHeaders() {
+    sortableHeaders.forEach((th) => {
+      const key = th.dataset.sort;
+      const arrow = th.querySelector(".sort-arrow");
+      const active = key === sortKey;
+      th.classList.toggle("sort-active", active);
+      arrow.textContent = active ? (sortDir === "asc" ? "▲" : "▼") : "";
+    });
+  }
+
+  sortableHeaders.forEach((th) => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sort;
+      if (sortKey !== key) {
+        sortKey = key;
+        sortDir = "asc";
+      } else if (sortDir === "asc") {
+        sortDir = "desc";
+      } else {
+        sortKey = null; // 세 번째 클릭 -> 정렬 해제, 기본 순서로 복귀
+      }
+      updateSortHeaders();
+      renderRecords();
+    });
+  });
+
   function renderRecords() {
     if (records.length === 0) {
       recordsBody.innerHTML = "";
@@ -286,7 +333,7 @@
     }
     emptyMsg.classList.add("hidden");
 
-    recordsBody.innerHTML = records
+    recordsBody.innerHTML = sortedRecords()
       .map((r) => {
         if (editingId === r.id) return editRowHtml(r);
         return viewRowHtml(r);
