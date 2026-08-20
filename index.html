@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-<title>현장 청구/입금 체크</title>
+<title>비엠에스코리아 부산지사 | 현장 청구/입금 체크</title>
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -11,7 +11,8 @@
   <!-- 로그인 화면 -->
   <div id="loginView" class="login-wrap">
     <form id="loginForm" class="login-box">
-      <h1>현장 청구/입금 체크</h1>
+      <h1>비엠에스코리아 부산지사</h1>
+      <p class="login-app-name">현장 청구/입금 체크</p>
       <p class="login-sub">비밀번호를 입력하고 접속하세요</p>
       <input id="loginPassword" type="password" placeholder="비밀번호" autocomplete="current-password" required />
       <button type="submit">로그인</button>
@@ -22,7 +23,10 @@
   <!-- 메인 화면 -->
   <div id="appView" class="app-wrap hidden">
     <header class="app-header">
-      <h1>현장 청구/입금 체크</h1>
+      <div class="brand">
+        <div class="brand-company">비엠에스코리아 부산지사</div>
+        <div class="brand-app">현장 청구/입금 체크</div>
+      </div>
       <div class="header-actions">
         <span id="lastSync" class="last-sync"></span>
         <button id="siteManageBtn" class="btn btn-ghost">현장 관리</button>
@@ -32,7 +36,7 @@
 
     <nav class="tab-bar">
       <button id="tabListBtn" class="tab-btn tab-active" data-tab="list">내역 목록</button>
-      <button id="tabHistoryBtn" class="tab-btn" data-tab="history">월별 히스토리</button>
+      <button id="tabHistoryBtn" class="tab-btn" data-tab="history">히스토리</button>
     </nav>
 
     <div id="listSection">
@@ -43,7 +47,7 @@
         <div class="card-value" id="sumTotal">0</div>
       </div>
       <div class="card card-warn">
-        <div class="card-label">청구 대기</div>
+        <div class="card-label">품의 대기</div>
         <div class="card-value" id="sumUnbilled">0</div>
       </div>
       <div class="card card-warn">
@@ -80,7 +84,7 @@
         </label>
         <input id="newContent" type="text" placeholder="내용 입력" />
         <input id="newCost" type="number" placeholder="비용 입력 (원)" min="0" />
-        <label class="chk"><input id="newBilled" type="checkbox" /> 청구함</label>
+        <label class="chk"><input id="newBilled" type="checkbox" /> 품의 올림</label>
         <label class="chk"><input id="newPaid" type="checkbox" /> 입금됨</label>
         <label class="field-label">입금일
           <input id="newPaidDate" type="date" />
@@ -101,7 +105,7 @@
             <th class="col-date">작업일</th>
             <th class="col-content">내용</th>
             <th class="col-cost">비용</th>
-            <th class="col-check">청구</th>
+            <th class="col-check">품의</th>
             <th class="col-check">입금</th>
             <th class="col-date">입금일</th>
             <th class="col-manage">관리</th>
@@ -116,14 +120,18 @@
     </div>
     <!-- /listSection -->
 
-    <!-- 월별 히스토리 화면 -->
+    <!-- 히스토리 화면 (월별 / 연도별) -->
     <div id="historyView" class="hidden">
+      <nav class="subtab-bar">
+        <button id="historyModeMonthBtn" class="subtab-btn subtab-active" data-mode="month">월별</button>
+        <button id="historyModeYearBtn" class="subtab-btn" data-mode="year">연도별</button>
+      </nav>
       <section class="table-wrap">
         <table id="historyTable">
           <thead>
             <tr>
               <th></th>
-              <th class="col-site">월</th>
+              <th class="col-site" id="historyPeriodHeader">월</th>
               <th class="col-cost">작업 건수</th>
               <th class="col-cost">청구금액 합계</th>
               <th class="col-cost">입금금액 합계</th>

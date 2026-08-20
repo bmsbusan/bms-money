@@ -34,6 +34,9 @@
   const historyView = $("#historyView");
   const historyBody = $("#historyBody");
   const historyEmptyMsg = $("#historyEmptyMsg");
+  const historyModeMonthBtn = $("#historyModeMonthBtn");
+  const historyModeYearBtn = $("#historyModeYearBtn");
+  const historyPeriodHeader = $("#historyPeriodHeader");
 
   const recordsBody = $("#recordsBody");
   const emptyMsg = $("#emptyMsg");
@@ -58,6 +61,7 @@
   let activeTab = "list";
   let historyRows = [];
   let expandedMonths = new Set();
+  let historyMode = "month"; // "month" | "year"
 
   const won = (n) => (Number(n) || 0).toLocaleString("ko-KR") + "원";
 
@@ -464,6 +468,17 @@
     renderHistory();
   }
 
+  function switchHistoryMode(mode) {
+    historyMode = mode;
+    historyModeMonthBtn.classList.toggle("subtab-active", mode === "month");
+    historyModeYearBtn.classList.toggle("subtab-active", mode === "year");
+    historyPeriodHeader.textContent = mode === "month" ? "월" : "연도";
+    expandedMonths.clear();
+    renderHistory();
+  }
+  historyModeMonthBtn.addEventListener("click", () => switchHistoryMode("month"));
+  historyModeYearBtn.addEventListener("click", () => switchHistoryMode("year"));
+
   function renderHistory() {
     if (historyRows.length === 0) {
       historyBody.innerHTML = "";
@@ -472,28 +487,40 @@
     }
     historyEmptyMsg.classList.add("hidden");
 
-    // month별로 묶기
-    const byMonth = new Map();
+    // 월별 또는 연도별로 묶기 (연도별은 월별 데이터를 다시 합산)
+    const byPeriod = new Map();
     for (const row of historyRows) {
       const m = row.month || "미상";
-      if (!byMonth.has(m)) {
-        byMonth.set(m, { month: m, count: 0, billed_total: 0, paid_total: 0, sites: [] });
+      const key = historyMode === "year" ? m.slice(0, 4) || "미상" : m;
+      if (!byPeriod.has(key)) {
+        byPeriod.set(key, { period: key, count: 0, billed_total: 0, paid_total: 0, sitesMap: new Map() });
       }
-      const bucket = byMonth.get(m);
+      const bucket = byPeriod.get(key);
       bucket.count += row.count;
       bucket.billed_total += row.billed_total || 0;
       bucket.paid_total += row.paid_total || 0;
-      bucket.sites.push(row);
+
+      // 연도별일 때는 같은 현장이 여러 달에 걸쳐 나올 수 있으므로 현장 기준으로 다시 합산
+      const s = bucket.sitesMap.get(row.site_name) || {
+        site_name: row.site_name, count: 0, billed_total: 0, billed_count: 0, paid_total: 0, paid_count: 0,
+      };
+      s.count += row.count;
+      s.billed_total += row.billed_total || 0;
+      s.billed_count += row.billed_count || 0;
+      s.paid_total += row.paid_total || 0;
+      s.paid_count += row.paid_count || 0;
+      bucket.sitesMap.set(row.site_name, s);
     }
 
-    const months = Array.from(byMonth.values()).sort((a, b) => (a.month < b.month ? 1 : -1));
+    const periods = Array.from(byPeriod.values()).sort((a, b) => (a.period < b.period ? 1 : -1));
 
-    historyBody.innerHTML = months
+    historyBody.innerHTML = periods
       .map((m) => {
         const deficit = m.billed_total - m.paid_total;
-        const isExpanded = expandedMonths.has(m.month);
+        const isExpanded = expandedMonths.has(m.period);
+        const siteRows = Array.from(m.sitesMap.values()).sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
         const detailRows = isExpanded
-          ? m.sites
+          ? siteRows
               .map(
                 (s) => `
               <tr class="site-detail-row">
@@ -508,9 +535,9 @@
               .join("")
           : "";
         return `
-          <tr class="month-row ${isExpanded ? "expanded" : ""}" data-month="${m.month}">
+          <tr class="month-row ${isExpanded ? "expanded" : ""}" data-period="${m.period}">
             <td class="expand-cell"><span class="expand-icon">▶</span></td>
-            <td class="site-badge">${escapeHtml(m.month)}</td>
+            <td class="site-badge">${escapeHtml(historyMode === "year" ? m.period + "년" : m.period)}</td>
             <td class="col-cost">${m.count}건</td>
             <td class="col-cost">${won(m.billed_total)}</td>
             <td class="col-cost">${won(m.paid_total)}</td>
@@ -524,18 +551,26 @@
   historyBody.addEventListener("click", (e) => {
     const row = e.target.closest(".month-row");
     if (!row) return;
-    const month = row.getAttribute("data-month");
+    const period = row.getAttribute("data-period");
 
-    // 아이콘(또는 행의 첫 칸)을 클릭하면 상세 펼치기/접기, 그 외 영역은 목록 탭으로 이동
+    // 아이콘(또는 행의 첫 칸)을 클릭하면 상세 펼치기/접기
     if (e.target.closest(".expand-cell")) {
-      if (expandedMonths.has(month)) expandedMonths.delete(month);
-      else expandedMonths.add(month);
+      if (expandedMonths.has(period)) expandedMonths.delete(period);
+      else expandedMonths.add(period);
+      renderHistory();
+      return;
+    }
+
+    if (historyMode === "year") {
+      // 연도별 화면에서는 목록에 연도 단위 필터가 없으므로, 행 클릭으로도 상세를 펼치고/접습니다.
+      if (expandedMonths.has(period)) expandedMonths.delete(period);
+      else expandedMonths.add(period);
       renderHistory();
       return;
     }
 
     // 월 행 클릭 -> 내역 목록 탭으로 이동해서 해당 월로 필터링
-    filterMonth.value = month;
+    filterMonth.value = period;
     filterSite.value = "";
     switchTab("list");
     loadRecords();

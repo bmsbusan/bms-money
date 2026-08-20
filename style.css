@@ -78,7 +78,8 @@ input[type="text"], input[type="number"], input[type="password"], input[type="da
   text-align: center;
   box-shadow: 0 4px 18px rgba(20, 20, 30, 0.06);
 }
-.login-sub { color: var(--text-muted); font-size: 13.5px; margin: 8px 0 20px; }
+.login-app-name { color: var(--primary); font-size: 14px; font-weight: 700; margin: 6px 0 0; }
+.login-sub { color: var(--text-muted); font-size: 13.5px; margin: 6px 0 20px; }
 .login-box input { width: 100%; margin-bottom: 12px; }
 .login-box button { width: 100%; }
 
@@ -102,6 +103,10 @@ input[type="text"], input[type="number"], input[type="password"], input[type="da
 .header-actions { display: flex; align-items: center; gap: 8px; }
 .last-sync { font-size: 12px; color: var(--text-muted); margin-right: 4px; }
 
+.brand { display: flex; flex-direction: column; gap: 2px; line-height: 1.25; }
+.brand-company { font-size: 13px; font-weight: 700; color: var(--primary); }
+.brand-app { font-size: 20px; font-weight: 700; color: var(--text); }
+
 .tab-bar {
   display: flex;
   gap: 6px;
@@ -123,6 +128,27 @@ input[type="text"], input[type="number"], input[type="password"], input[type="da
   color: var(--primary);
   font-weight: 700;
   border-bottom: 2px solid var(--primary);
+}
+
+.subtab-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.subtab-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.subtab-btn:hover { background: #f0f1f3; }
+.subtab-btn.subtab-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: 600;
 }
 
 .summary-cards {
