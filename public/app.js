@@ -18,6 +18,7 @@
   const addRecordBtn = $("#addRecordBtn");
   const addForm = $("#addForm");
   const newSite = $("#newSite");
+  const newWorkDate = $("#newWorkDate");
   const newContent = $("#newContent");
   const newCost = $("#newCost");
   const newBilled = $("#newBilled");
@@ -26,6 +27,16 @@
   const saveNewBtn = $("#saveNewBtn");
   const cancelNewBtn = $("#cancelNewBtn");
   const addError = $("#addError");
+
+  const tabListBtn = $("#tabListBtn");
+  const tabHistoryBtn = $("#tabHistoryBtn");
+  const listSection = $("#listSection");
+  const historyView = $("#historyView");
+  const historyBody = $("#historyBody");
+  const historyEmptyMsg = $("#historyEmptyMsg");
+  const historyModeMonthBtn = $("#historyModeMonthBtn");
+  const historyModeYearBtn = $("#historyModeYearBtn");
+  const historyPeriodHeader = $("#historyPeriodHeader");
 
   const recordsBody = $("#recordsBody");
   const emptyMsg = $("#emptyMsg");
@@ -47,6 +58,10 @@
   let records = [];
   let editingId = null;
   let pollTimer = null;
+  let activeTab = "list";
+  let historyRows = [];
+  let expandedMonths = new Set();
+  let historyMode = "month"; // "month" | "year"
 
   const won = (n) => (Number(n) || 0).toLocaleString("ko-KR") + "원";
 
@@ -92,6 +107,20 @@
     startPolling();
   }
 
+  // ---------- 탭 전환 (내역 목록 / 월별 히스토리) ----------
+
+  function switchTab(tab) {
+    activeTab = tab;
+    tabListBtn.classList.toggle("tab-active", tab === "list");
+    tabHistoryBtn.classList.toggle("tab-active", tab === "history");
+    listSection.classList.toggle("hidden", tab !== "list");
+    historyView.classList.toggle("hidden", tab !== "history");
+    if (tab === "history") loadMonthlySummary();
+  }
+
+  tabListBtn.addEventListener("click", () => switchTab("list"));
+  tabHistoryBtn.addEventListener("click", () => switchTab("history"));
+
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     loginError.textContent = "";
@@ -117,7 +146,11 @@
     stopPolling();
     pollTimer = setInterval(() => {
       if (editingId !== null) return; // 편집 중에는 화면을 덮어쓰지 않음
-      loadRecords();
+      if (activeTab === "history") {
+        loadMonthlySummary();
+      } else {
+        loadRecords();
+      }
     }, 5000);
   }
   function stopPolling() {
@@ -126,7 +159,8 @@
   }
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && !appView.classList.contains("hidden")) {
-      loadRecords();
+      if (activeTab === "history") loadMonthlySummary();
+      else loadRecords();
     }
   });
 
@@ -214,7 +248,9 @@
   }
 
   function rebuildMonthFilterOptions() {
-    const months = new Set(records.map((r) => (r.created_at || "").slice(0, 7)).filter(Boolean));
+    const months = new Set(
+      records.map((r) => (r.work_date || r.created_at || "").slice(0, 7)).filter(Boolean)
+    );
     const prev = filterMonth.value;
     const sorted = Array.from(months).sort().reverse();
     filterMonth.innerHTML =
@@ -262,6 +298,7 @@
     return `
       <tr class="${r.paid ? "paid-row" : ""}" data-id="${r.id}">
         <td class="site-badge">${escapeHtml(r.site_name)}</td>
+        <td class="col-date">${escapeHtml(r.work_date) || "-"}</td>
         <td class="content-cell" title="${escapeHtml(r.content)}">${escapeHtml(r.content) || "-"}</td>
         <td class="col-cost">${won(r.cost)}</td>
         <td class="col-check">
@@ -289,6 +326,7 @@
     return `
       <tr data-id="${r.id}">
         <td><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
+        <td class="col-date"><input class="edit-input" type="date" data-edit="work_date" value="${r.work_date || ""}" /></td>
         <td><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
         <td class="col-cost"><input class="edit-input" type="number" min="0" data-edit="cost" value="${r.cost}" /></td>
         <td class="col-check">
@@ -336,6 +374,7 @@
       const row = e.target.closest("tr");
       const patch = {
         site_name: row.querySelector('[data-edit="site_name"]').value,
+        work_date: row.querySelector('[data-edit="work_date"]').value || null,
         content: row.querySelector('[data-edit="content"]').value,
         cost: Number(row.querySelector('[data-edit="cost"]').value) || 0,
         billed: row.querySelector('[data-edit="billed"]').checked,
@@ -370,14 +409,24 @@
   addRecordBtn.addEventListener("click", () => {
     addError.textContent = "";
     addForm.classList.toggle("hidden");
+    if (!addForm.classList.contains("hidden") && !newWorkDate.value) {
+      newWorkDate.value = todayStr();
+    }
   });
   cancelNewBtn.addEventListener("click", () => {
     addForm.classList.add("hidden");
     resetAddForm();
   });
 
+  function todayStr() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
   function resetAddForm() {
     newSite.value = "";
+    newWorkDate.value = todayStr();
     newContent.value = "";
     newCost.value = "";
     newBilled.checked = false;
@@ -389,11 +438,13 @@
   saveNewBtn.addEventListener("click", async () => {
     addError.textContent = "";
     if (!newSite.value) { addError.textContent = "현장을 선택해주세요."; return; }
+    if (!newWorkDate.value) { addError.textContent = "작업 날짜를 선택해주세요."; return; }
     try {
       await api("/api/records", {
         method: "POST",
         body: JSON.stringify({
           site_name: newSite.value,
+          work_date: newWorkDate.value,
           content: newContent.value,
           cost: Number(newCost.value) || 0,
           billed: newBilled.checked,
@@ -407,6 +458,122 @@
     } catch (err) {
       addError.textContent = err.message;
     }
+  });
+
+  // ---------- 월별 히스토리 ----------
+
+  async function loadMonthlySummary() {
+    const data = await api("/api/monthly-summary");
+    historyRows = data.rows || [];
+    renderHistory();
+  }
+
+  function switchHistoryMode(mode) {
+    historyMode = mode;
+    historyModeMonthBtn.classList.toggle("subtab-active", mode === "month");
+    historyModeYearBtn.classList.toggle("subtab-active", mode === "year");
+    historyPeriodHeader.textContent = mode === "month" ? "월" : "연도";
+    expandedMonths.clear();
+    renderHistory();
+  }
+  historyModeMonthBtn.addEventListener("click", () => switchHistoryMode("month"));
+  historyModeYearBtn.addEventListener("click", () => switchHistoryMode("year"));
+
+  function renderHistory() {
+    if (historyRows.length === 0) {
+      historyBody.innerHTML = "";
+      historyEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    historyEmptyMsg.classList.add("hidden");
+
+    // 월별 또는 연도별로 묶기 (연도별은 월별 데이터를 다시 합산)
+    const byPeriod = new Map();
+    for (const row of historyRows) {
+      const m = row.month || "미상";
+      const key = historyMode === "year" ? m.slice(0, 4) || "미상" : m;
+      if (!byPeriod.has(key)) {
+        byPeriod.set(key, { period: key, count: 0, billed_total: 0, paid_total: 0, sitesMap: new Map() });
+      }
+      const bucket = byPeriod.get(key);
+      bucket.count += row.count;
+      bucket.billed_total += row.billed_total || 0;
+      bucket.paid_total += row.paid_total || 0;
+
+      // 연도별일 때는 같은 현장이 여러 달에 걸쳐 나올 수 있으므로 현장 기준으로 다시 합산
+      const s = bucket.sitesMap.get(row.site_name) || {
+        site_name: row.site_name, count: 0, billed_total: 0, billed_count: 0, paid_total: 0, paid_count: 0,
+      };
+      s.count += row.count;
+      s.billed_total += row.billed_total || 0;
+      s.billed_count += row.billed_count || 0;
+      s.paid_total += row.paid_total || 0;
+      s.paid_count += row.paid_count || 0;
+      bucket.sitesMap.set(row.site_name, s);
+    }
+
+    const periods = Array.from(byPeriod.values()).sort((a, b) => (a.period < b.period ? 1 : -1));
+
+    historyBody.innerHTML = periods
+      .map((m) => {
+        const deficit = m.billed_total - m.paid_total;
+        const isExpanded = expandedMonths.has(m.period);
+        const siteRows = Array.from(m.sitesMap.values()).sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
+        const detailRows = isExpanded
+          ? siteRows
+              .map(
+                (s) => `
+              <tr class="site-detail-row">
+                <td></td>
+                <td class="site-detail-name">${escapeHtml(s.site_name)}</td>
+                <td class="col-cost">${s.count}건</td>
+                <td class="col-cost">${won(s.billed_total)} (${s.billed_count}건)</td>
+                <td class="col-cost">${won(s.paid_total)} (${s.paid_count}건)</td>
+                <td class="col-cost">${won((s.billed_total || 0) - (s.paid_total || 0))}</td>
+              </tr>`
+              )
+              .join("")
+          : "";
+        return `
+          <tr class="month-row ${isExpanded ? "expanded" : ""}" data-period="${m.period}">
+            <td class="expand-cell"><span class="expand-icon">▶</span></td>
+            <td class="site-badge">${escapeHtml(historyMode === "year" ? m.period + "년" : m.period)}</td>
+            <td class="col-cost">${m.count}건</td>
+            <td class="col-cost">${won(m.billed_total)}</td>
+            <td class="col-cost">${won(m.paid_total)}</td>
+            <td class="col-cost ${deficit > 0 ? "deficit" : "deficit-zero"}">${won(deficit)}</td>
+          </tr>
+          ${detailRows}`;
+      })
+      .join("");
+  }
+
+  historyBody.addEventListener("click", (e) => {
+    const row = e.target.closest(".month-row");
+    if (!row) return;
+    const period = row.getAttribute("data-period");
+
+    // 아이콘(또는 행의 첫 칸)을 클릭하면 상세 펼치기/접기
+    if (e.target.closest(".expand-cell")) {
+      if (expandedMonths.has(period)) expandedMonths.delete(period);
+      else expandedMonths.add(period);
+      renderHistory();
+      return;
+    }
+
+    if (historyMode === "year") {
+      // 연도별 화면에서는 목록에 연도 단위 필터가 없으므로, 행 클릭으로도 상세를 펼치고/접습니다.
+      if (expandedMonths.has(period)) expandedMonths.delete(period);
+      else expandedMonths.add(period);
+      renderHistory();
+      return;
+    }
+
+    // 월 행 클릭 -> 내역 목록 탭으로 이동해서 해당 월로 필터링
+    filterMonth.value = period;
+    filterSite.value = "";
+    switchTab("list");
+    loadRecords();
   });
 
   function escapeHtml(str) {

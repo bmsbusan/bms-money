@@ -78,7 +78,8 @@ input[type="text"], input[type="number"], input[type="password"], input[type="da
   text-align: center;
   box-shadow: 0 4px 18px rgba(20, 20, 30, 0.06);
 }
-.login-sub { color: var(--text-muted); font-size: 13.5px; margin: 8px 0 20px; }
+.login-app-name { color: var(--primary); font-size: 14px; font-weight: 700; margin: 6px 0 0; }
+.login-sub { color: var(--text-muted); font-size: 13.5px; margin: 6px 0 20px; }
 .login-box input { width: 100%; margin-bottom: 12px; }
 .login-box button { width: 100%; }
 
@@ -101,6 +102,54 @@ input[type="text"], input[type="number"], input[type="password"], input[type="da
 }
 .header-actions { display: flex; align-items: center; gap: 8px; }
 .last-sync { font-size: 12px; color: var(--text-muted); margin-right: 4px; }
+
+.brand { display: flex; flex-direction: column; gap: 2px; line-height: 1.25; }
+.brand-company { font-size: 13px; font-weight: 700; color: var(--primary); }
+.brand-app { font-size: 20px; font-weight: 700; color: var(--text); }
+
+.tab-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.tab-active {
+  color: var(--primary);
+  font-weight: 700;
+  border-bottom: 2px solid var(--primary);
+}
+
+.subtab-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.subtab-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.subtab-btn:hover { background: #f0f1f3; }
+.subtab-btn.subtab-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
 
 .summary-cards {
   display: grid;
@@ -138,12 +187,19 @@ input[type="text"], input[type="number"], input[type="password"], input[type="da
 }
 .add-form-grid {
   display: grid;
-  grid-template-columns: 1.2fr 2fr 1fr auto auto 1fr;
-  gap: 10px;
-  align-items: center;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  align-items: end;
 }
 .add-form-grid input, .add-form-grid select { width: 100%; }
-.chk { display: flex; align-items: center; gap: 6px; font-size: 13.5px; white-space: nowrap; }
+.chk { display: flex; align-items: center; gap: 6px; font-size: 13.5px; white-space: nowrap; height: 38px; }
+.field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
 .add-form-actions { margin-top: 12px; display: flex; gap: 8px; }
 
 .table-wrap {
@@ -190,6 +246,28 @@ td.col-manage { text-align: right; white-space: nowrap; }
 .edit-input { width: 100%; padding: 6px 8px; font-size: 13.5px; }
 
 .empty-msg { text-align: center; color: var(--text-muted); padding: 30px 0; }
+
+/* ---------- 월별 히스토리 ---------- */
+#historyTable .month-row { cursor: pointer; }
+#historyTable .month-row:hover { background: #f7f8fa; }
+#historyTable .month-row td { font-weight: 600; }
+#historyTable .expand-icon {
+  display: inline-block;
+  width: 14px;
+  transition: transform 0.15s ease;
+  color: var(--text-muted);
+}
+#historyTable .month-row.expanded .expand-icon { transform: rotate(90deg); }
+#historyTable .site-detail-row td {
+  background: #fafbfc;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+#historyTable .site-detail-row .site-detail-name { color: var(--text); font-weight: 500; }
+#historyTable .deficit { color: var(--danger); font-weight: 700; }
+#historyTable .deficit-zero { color: var(--good-text); font-weight: 700; }
 
 /* ---------- 모달 ---------- */
 .modal-overlay {
