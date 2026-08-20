@@ -12,5 +12,5 @@ binding = "ASSETS"
 # 아래 database_id 값은 README 안내에 따라 `npx wrangler d1 create` 실행 후 나오는 값으로 반드시 교체해야 합니다.
 [[d1_databases]]
 binding = "DB"
-database_name = "hyunjang-payment-db"
+database_name = "bms-money"
 database_id = "34677038-d8a8-432f-a81e-3044c909d9b8"
