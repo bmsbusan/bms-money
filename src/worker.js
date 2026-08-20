@@ -99,6 +99,7 @@ function rowToRecord(row) {
     billed: !!row.billed,
     paid: !!row.paid,
     paid_date: row.paid_date || null,
+    bank_account: row.bank_account || "",
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -198,15 +199,16 @@ async function handleCreateRecord(request, env) {
   const billed = toBool(body.billed) ? 1 : 0;
   const paid = toBool(body.paid) ? 1 : 0;
   const paid_date = typeof body.paid_date === "string" && body.paid_date ? body.paid_date : null;
+  const bank_account = typeof body.bank_account === "string" ? body.bank_account.trim() : "";
 
   if (!site_name) return badRequest("현장명을 선택해주세요.");
   if (!work_date) return badRequest("작업 날짜를 선택해주세요.");
 
   const result = await env.DB.prepare(
-    `INSERT INTO records (site_name, work_date, content, cost, billed, paid, paid_date, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+    `INSERT INTO records (site_name, work_date, content, cost, billed, paid, paid_date, bank_account, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
   )
-    .bind(site_name, work_date, content, cost, billed, paid, paid_date)
+    .bind(site_name, work_date, content, cost, billed, paid, paid_date, bank_account)
     .run();
 
   return json({ ok: true, id: result.meta.last_row_id });
@@ -246,6 +248,10 @@ async function handleUpdateRecord(id, request, env) {
   if (body.paid_date !== undefined) {
     fields.push("paid_date = ?");
     binds.push(body.paid_date || null);
+  }
+  if (typeof body.bank_account === "string") {
+    fields.push("bank_account = ?");
+    binds.push(body.bank_account.trim());
   }
 
   if (fields.length === 0) return badRequest("수정할 내용이 없습니다.");
