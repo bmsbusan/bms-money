@@ -349,6 +349,10 @@ td.col-date { white-space: nowrap; }
     width: 100%;
   }
   #recordsTable tbody tr {
+    /* 위쪽의 일괄 width:100% 규칙 + 아래 margin이 합쳐지면 카드가 좌우로
+       margin만큼 컨테이너 밖으로 삐져나가므로, 여기서 반드시 width를
+       auto로 되돌려서 "여백을 제외한 나머지 폭"으로 계산되게 합니다. */
+    width: auto;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     margin: 10px;
