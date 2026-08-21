@@ -374,23 +374,23 @@
   function viewRowHtml(r) {
     return `
       <tr class="${r.paid ? "paid-row" : ""}" data-id="${r.id}">
-        <td class="site-badge">${escapeHtml(r.site_name)}</td>
-        <td class="col-date">${escapeHtml(r.work_date) || "-"}</td>
-        <td class="content-cell" title="${escapeHtml(r.content)}">${escapeHtml(r.content) || "-"}</td>
-        <td class="col-cost">${won(r.cost)}</td>
-        <td class="col-check">
+        <td class="site-badge" data-label="현장명">${escapeHtml(r.site_name)}</td>
+        <td class="col-date" data-label="작업일">${escapeHtml(r.work_date) || "-"}</td>
+        <td class="content-cell" data-label="내용" title="${escapeHtml(r.content)}">${escapeHtml(r.content) || "-"}</td>
+        <td class="col-cost" data-label="비용">${won(r.cost)}</td>
+        <td class="col-check" data-label="품의">
           <input type="checkbox" data-action="toggle-billed" data-id="${r.id}" ${r.billed ? "checked" : ""} />
         </td>
-        <td class="col-check">
+        <td class="col-check" data-label="입금">
           <input type="checkbox" data-action="toggle-paid" data-id="${r.id}" ${r.paid ? "checked" : ""} />
         </td>
-        <td class="col-date">
+        <td class="col-date" data-label="입금일">
           <input type="date" class="edit-input" data-action="change-date" data-id="${r.id}" value="${r.paid_date || ""}" />
         </td>
-        <td class="col-bank">
+        <td class="col-bank" data-label="입금 통장">
           <select class="edit-input" data-action="change-bank" data-id="${r.id}">${bankAccountOptionsHtml(r.bank_account)}</select>
         </td>
-        <td class="col-manage">
+        <td class="col-manage" data-label="관리">
           <span class="row-actions">
             <button class="btn btn-ghost btn-sm" data-action="edit" data-id="${r.id}">수정</button>
             <button class="btn btn-danger btn-sm" data-action="delete" data-id="${r.id}">삭제</button>
@@ -405,19 +405,19 @@
       .join("");
     return `
       <tr data-id="${r.id}">
-        <td><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
-        <td class="col-date"><input class="edit-input" type="date" data-edit="work_date" value="${r.work_date || ""}" /></td>
-        <td><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
-        <td class="col-cost"><input class="edit-input" type="number" min="0" data-edit="cost" value="${r.cost}" /></td>
-        <td class="col-check">
+        <td data-label="현장명"><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
+        <td class="col-date" data-label="작업일"><input class="edit-input" type="date" data-edit="work_date" value="${r.work_date || ""}" /></td>
+        <td data-label="내용"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
+        <td class="col-cost" data-label="비용"><input class="edit-input" type="number" min="0" data-edit="cost" value="${r.cost}" /></td>
+        <td class="col-check" data-label="품의">
           <input type="checkbox" data-edit="billed" ${r.billed ? "checked" : ""} />
         </td>
-        <td class="col-check">
+        <td class="col-check" data-label="입금">
           <input type="checkbox" data-edit="paid" ${r.paid ? "checked" : ""} />
         </td>
-        <td class="col-date"><input class="edit-input" type="date" data-edit="paid_date" value="${r.paid_date || ""}" /></td>
-        <td class="col-bank"><select class="edit-input" data-edit="bank_account">${bankAccountOptionsHtml(r.bank_account)}</select></td>
-        <td class="col-manage">
+        <td class="col-date" data-label="입금일"><input class="edit-input" type="date" data-edit="paid_date" value="${r.paid_date || ""}" /></td>
+        <td class="col-bank" data-label="입금 통장"><select class="edit-input" data-edit="bank_account">${bankAccountOptionsHtml(r.bank_account)}</select></td>
+        <td class="col-manage" data-label="관리">
           <span class="row-actions">
             <button class="btn btn-primary btn-sm" data-action="save-edit" data-id="${r.id}">저장</button>
             <button class="btn btn-ghost btn-sm" data-action="cancel-edit" data-id="${r.id}">취소</button>

@@ -330,4 +330,51 @@ td.col-date { white-space: nowrap; }
 @media (max-width: 720px) {
   .summary-cards { grid-template-columns: repeat(2, 1fr); }
   .add-form-grid { grid-template-columns: 1fr 1fr; }
+
+  /* ---------- 좁은 화면: 내역 목록 표를 카드 형태로 전환 ----------
+     열이 좁아져서 텍스트가 줄바꿈되며 행마다 높이가 달라지는(단차) 문제를
+     근본적으로 없애기 위해, 표 대신 항목별로 세로로 쌓아서 보여줍니다. */
+  #listSection .table-wrap { overflow-x: visible; }
+  #recordsTable { min-width: 0; width: 100%; }
+  #recordsTable thead { display: none; }
+  #recordsTable, #recordsTable tbody, #recordsTable tr, #recordsTable td {
+    display: block;
+    width: 100%;
+  }
+  #recordsTable tbody tr {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin: 10px;
+    padding: 2px 14px;
+  }
+  #recordsTable tbody tr.paid-row { border-color: var(--paid-row-border); }
+  #recordsTable tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px dashed var(--border);
+    white-space: normal;
+  }
+  #recordsTable tbody tr td:last-child { border-bottom: none; }
+  #recordsTable tbody td::before {
+    content: attr(data-label);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    flex: 0 0 auto;
+  }
+  #recordsTable td.site-badge { font-size: 16px; }
+  #recordsTable td.content-cell {
+    max-width: none;
+    overflow: visible;
+    text-overflow: initial;
+    white-space: normal;
+    text-align: right;
+  }
+  #recordsTable td.col-manage::before { content: none; }
+  #recordsTable td.col-manage { justify-content: flex-end; }
+  #recordsTable .edit-input { width: auto; max-width: 200px; margin-left: auto; }
+  #recordsTable select.edit-input { min-width: 0; }
 }
