@@ -625,26 +625,27 @@
         const detailRows = isExpanded
           ? siteRows
               .map(
-                (s) => `
-              <tr class="site-detail-row">
-                <td></td>
-                <td class="site-detail-name">${escapeHtml(s.site_name)}</td>
-                <td class="col-cost">${s.count}건</td>
-                <td class="col-cost">${won(s.billed_total)} (${s.count}건)</td>
-                <td class="col-cost">${won(s.paid_total)} (${s.paid_count}건)</td>
-                <td class="col-cost">${won((s.billed_total || 0) - (s.paid_total || 0))}</td>
+                (s, i) => `
+              <tr class="site-detail-row ${i === siteRows.length - 1 ? "last-detail" : ""}" data-period="${m.period}" data-site="${escapeHtml(s.site_name)}">
+                <td class="site-detail-name" data-label="현장명"><span class="cell-value">${escapeHtml(s.site_name)}</span></td>
+                <td class="col-cost" data-label="작업 건수"><span class="cell-value">${s.count}건</span></td>
+                <td class="col-cost" data-label="청구금액"><span class="cell-value">${won(s.billed_total)} (${s.count}건)</span></td>
+                <td class="col-cost" data-label="입금금액"><span class="cell-value">${won(s.paid_total)} (${s.paid_count}건)</span></td>
+                <td class="col-cost" data-label="미수금"><span class="cell-value">${won((s.billed_total || 0) - (s.paid_total || 0))}</span></td>
               </tr>`
               )
               .join("")
           : "";
+        const periodLabel = historyMode === "year" ? m.period + "년" : m.period;
         return `
           <tr class="month-row ${isExpanded ? "expanded" : ""}" data-period="${m.period}">
-            <td class="expand-cell"><span class="expand-icon">▶</span></td>
-            <td class="site-badge">${escapeHtml(historyMode === "year" ? m.period + "년" : m.period)}</td>
-            <td class="col-cost">${m.count}건</td>
-            <td class="col-cost">${won(m.billed_total)}</td>
-            <td class="col-cost">${won(m.paid_total)}</td>
-            <td class="col-cost ${deficit > 0 ? "deficit" : "deficit-zero"}">${won(deficit)}</td>
+            <td class="period-cell" data-label="${historyMode === "year" ? "연도" : "월"}">
+              <span class="expand-icon">▶</span><span class="cell-value">${escapeHtml(periodLabel)}</span><span class="period-hint">${isExpanded ? "접기" : "현장별 보기"}</span>
+            </td>
+            <td class="col-cost" data-label="작업 건수"><span class="cell-value">${m.count}건</span></td>
+            <td class="col-cost" data-label="청구금액 합계"><span class="cell-value">${won(m.billed_total)}</span></td>
+            <td class="col-cost" data-label="입금금액 합계"><span class="cell-value">${won(m.paid_total)}</span></td>
+            <td class="col-cost ${deficit > 0 ? "deficit" : "deficit-zero"}" data-label="미수금"><span class="cell-value">${won(deficit)}</span></td>
           </tr>
           ${detailRows}`;
       })
@@ -652,12 +653,22 @@
   }
 
   historyBody.addEventListener("click", (e) => {
+    // 현장별 상세 줄을 누르면 그 달 + 그 현장의 실제 내역으로 이동
+    const detail = e.target.closest(".site-detail-row");
+    if (detail) {
+      if (historyMode === "year") return;
+      filterMonth.value = detail.getAttribute("data-period");
+      filterSite.value = detail.getAttribute("data-site") || "";
+      switchTab(historyFilterCategory.value || "작업내역");
+      return;
+    }
+
     const row = e.target.closest(".month-row");
     if (!row) return;
     const period = row.getAttribute("data-period");
 
-    // 아이콘(또는 행의 첫 칸)을 클릭하면 상세 펼치기/접기
-    if (e.target.closest(".expand-cell")) {
+    // 기간 칸(펼침 아이콘이 있는 칸)을 누르면 현장별 상세 펼치기/접기
+    if (e.target.closest(".period-cell")) {
       if (expandedMonths.has(period)) expandedMonths.delete(period);
       else expandedMonths.add(period);
       renderHistory();
