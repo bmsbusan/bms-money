@@ -250,6 +250,7 @@ td.col-cost { text-align: right; font-variant-numeric: tabular-nums; }
 td.col-check { text-align: center; }
 .col-manage { text-align: right; }
 td.col-manage { text-align: right; white-space: nowrap; }
+td.col-date { white-space: nowrap; }
 .col-bank select.edit-input { min-width: 190px; }
 
 .content-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
