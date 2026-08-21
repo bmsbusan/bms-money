@@ -374,10 +374,10 @@
   function viewRowHtml(r) {
     return `
       <tr class="${r.paid ? "paid-row" : ""}" data-id="${r.id}">
-        <td class="site-badge" data-label="현장명">${escapeHtml(r.site_name)}</td>
-        <td class="col-date" data-label="작업일">${escapeHtml(r.work_date) || "-"}</td>
-        <td class="content-cell" data-label="내용" title="${escapeHtml(r.content)}">${escapeHtml(r.content) || "-"}</td>
-        <td class="col-cost" data-label="비용">${won(r.cost)}</td>
+        <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
+        <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+        <td class="content-cell" data-label="내용" title="${escapeHtml(r.content)}"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
+        <td class="col-cost" data-label="비용"><span class="cell-value">${won(r.cost)}</span></td>
         <td class="col-check" data-label="품의">
           <input type="checkbox" data-action="toggle-billed" data-id="${r.id}" ${r.billed ? "checked" : ""} />
         </td>
