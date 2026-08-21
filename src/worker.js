@@ -12,6 +12,10 @@
 const SESSION_COOKIE = "session";
 const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30일
 
+// 내역 구분 (탭) 종류
+const ALLOWED_CATEGORIES = ["작업내역", "소독", "저수조청소"];
+const DEFAULT_CATEGORY = "작업내역";
+
 function json(data, init = {}) {
   return new Response(JSON.stringify(data), {
     ...init,
@@ -100,6 +104,7 @@ function rowToRecord(row) {
     paid: !!row.paid,
     paid_date: row.paid_date || null,
     bank_account: row.bank_account || "",
+    category: row.category || DEFAULT_CATEGORY,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -171,9 +176,14 @@ async function handleGetRecords(request, env) {
   const url = new URL(request.url);
   const site = url.searchParams.get("site") || "";
   const month = url.searchParams.get("month") || ""; // YYYY-MM
+  const category = url.searchParams.get("category") || "";
 
   let query = "SELECT * FROM records WHERE 1=1";
   const binds = [];
+  if (category) {
+    query += " AND category = ?";
+    binds.push(category);
+  }
   if (site) {
     query += " AND site_name = ?";
     binds.push(site);
@@ -200,15 +210,17 @@ async function handleCreateRecord(request, env) {
   const paid = toBool(body.paid) ? 1 : 0;
   const paid_date = typeof body.paid_date === "string" && body.paid_date ? body.paid_date : null;
   const bank_account = typeof body.bank_account === "string" ? body.bank_account.trim() : "";
+  const categoryRaw = typeof body.category === "string" ? body.category.trim() : "";
+  const category = ALLOWED_CATEGORIES.includes(categoryRaw) ? categoryRaw : DEFAULT_CATEGORY;
 
   if (!site_name) return badRequest("현장명을 선택해주세요.");
   if (!work_date) return badRequest("작업 날짜를 선택해주세요.");
 
   const result = await env.DB.prepare(
-    `INSERT INTO records (site_name, work_date, content, cost, billed, paid, paid_date, bank_account, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+    `INSERT INTO records (site_name, work_date, content, cost, billed, paid, paid_date, bank_account, category, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
   )
-    .bind(site_name, work_date, content, cost, billed, paid, paid_date, bank_account)
+    .bind(site_name, work_date, content, cost, billed, paid, paid_date, bank_account, category)
     .run();
 
   return json({ ok: true, id: result.meta.last_row_id });
@@ -253,6 +265,10 @@ async function handleUpdateRecord(id, request, env) {
     fields.push("bank_account = ?");
     binds.push(body.bank_account.trim());
   }
+  if (typeof body.category === "string" && ALLOWED_CATEGORIES.includes(body.category.trim())) {
+    fields.push("category = ?");
+    binds.push(body.category.trim());
+  }
 
   if (fields.length === 0) return badRequest("수정할 내용이 없습니다.");
 
@@ -277,6 +293,7 @@ async function handleMonthlySummary(env) {
     `SELECT
        strftime('%Y-%m', COALESCE(work_date, created_at)) AS month,
        site_name,
+       category,
        COUNT(*) AS count,
        SUM(cost) AS cost_total,
        SUM(CASE WHEN billed = 1 THEN cost ELSE 0 END) AS billed_total,
@@ -284,7 +301,7 @@ async function handleMonthlySummary(env) {
        SUM(CASE WHEN paid = 1 THEN cost ELSE 0 END) AS paid_total,
        SUM(CASE WHEN paid = 1 THEN 1 ELSE 0 END) AS paid_count
      FROM records
-     GROUP BY month, site_name
+     GROUP BY month, site_name, category
      ORDER BY month DESC, site_name ASC`
   ).all();
   return json({ rows: results });
