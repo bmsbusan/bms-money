@@ -13,6 +13,8 @@
   --good-text: #1a7f4b;
   --paid-row-bg: #eafaf1;
   --paid-row-border: #b7ecd0;
+  --header-sky-bg: #dceefc;
+  --header-sky-text: #0c4a6e;
   --radius: 10px;
 }
 
@@ -109,6 +111,7 @@ input[type="text"], input[type="number"], input[type="password"], input[type="da
 
 .tab-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--border);
@@ -137,7 +140,7 @@ input[type="text"], input[type="number"], input[type="password"], input[type="da
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
-.history-site-filter { margin-left: auto; }
+.history-category-filter { margin-left: auto; }
 .subtab-btn {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -211,21 +214,25 @@ input[type="text"], input[type="number"], input[type="password"], input[type="da
   border-radius: var(--radius);
   overflow-x: auto;
 }
-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+table { width: 100%; border-collapse: collapse; min-width: 780px; }
 thead th {
   text-align: left;
   font-size: 12.5px;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: var(--header-sky-text);
+  background: var(--header-sky-bg);
   border-bottom: 1px solid var(--border);
   padding: 12px 14px;
   white-space: nowrap;
 }
+thead th:first-child { border-top-left-radius: var(--radius); }
+thead th:last-child { border-top-right-radius: var(--radius); }
 thead th.sortable {
   cursor: pointer;
   user-select: none;
 }
-thead th.sortable:hover { color: var(--text); }
-thead th.sortable.sort-active { color: var(--primary); font-weight: 700; }
+thead th.sortable:hover { color: var(--primary-dark); }
+thead th.sortable.sort-active { color: var(--primary-dark); font-weight: 700; }
 .sort-arrow { display: inline-block; width: 10px; margin-left: 2px; }
 tbody td {
   padding: 10px 14px;
@@ -247,10 +254,15 @@ td.col-manage { text-align: right; white-space: nowrap; }
 
 .content-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.col-site { min-width: 170px; }
+
 .site-badge {
   display: inline-block;
   font-weight: 600;
+  white-space: nowrap;
 }
+
+.site-detail-name { white-space: nowrap; }
 
 .row-actions { display: inline-flex; gap: 6px; }
 

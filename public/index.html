@@ -35,8 +35,10 @@
     </header>
 
     <nav class="tab-bar">
-      <button id="tabListBtn" class="tab-btn tab-active" data-tab="list">내역 목록</button>
-      <button id="tabHistoryBtn" class="tab-btn" data-tab="history">히스토리</button>
+      <button class="tab-btn tab-active" data-tab="작업내역">작업 내역</button>
+      <button class="tab-btn" data-tab="소독">소독</button>
+      <button class="tab-btn" data-tab="저수조청소">저수조 청소</button>
+      <button class="tab-btn" data-tab="history">히스토리</button>
     </nav>
 
     <div id="listSection">
@@ -131,6 +133,12 @@
       <nav class="subtab-bar">
         <button id="historyModeMonthBtn" class="subtab-btn subtab-active" data-mode="month">월별</button>
         <button id="historyModeYearBtn" class="subtab-btn" data-mode="year">연도별</button>
+        <select id="historyFilterCategory" class="history-category-filter">
+          <option value="">전체 구분</option>
+          <option value="작업내역">작업 내역</option>
+          <option value="소독">소독</option>
+          <option value="저수조청소">저수조 청소</option>
+        </select>
         <select id="historyFilterSite" class="history-site-filter">
           <option value="">전체 현장</option>
         </select>

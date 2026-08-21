@@ -12,6 +12,9 @@
     "이영웅 B통장 (부산 112-2357-7881-04)",
   ];
 
+  // 내역 구분 (탭) 종류 — 값은 서버(worker.js)의 ALLOWED_CATEGORIES 와 동일해야 합니다.
+  const CATEGORIES = ["작업내역", "소독", "저수조청소"];
+
   const loginView = $("#loginView");
   const appView = $("#appView");
   const loginForm = $("#loginForm");
@@ -38,8 +41,7 @@
   const cancelNewBtn = $("#cancelNewBtn");
   const addError = $("#addError");
 
-  const tabListBtn = $("#tabListBtn");
-  const tabHistoryBtn = $("#tabHistoryBtn");
+  const tabBtns = $$(".tab-btn");
   const listSection = $("#listSection");
   const historyView = $("#historyView");
   const historyBody = $("#historyBody");
@@ -47,6 +49,7 @@
   const historyModeMonthBtn = $("#historyModeMonthBtn");
   const historyModeYearBtn = $("#historyModeYearBtn");
   const historyPeriodHeader = $("#historyPeriodHeader");
+  const historyFilterCategory = $("#historyFilterCategory");
   const historyFilterSite = $("#historyFilterSite");
 
   const recordsBody = $("#recordsBody");
@@ -70,7 +73,7 @@
   let records = [];
   let editingId = null;
   let pollTimer = null;
-  let activeTab = "list";
+  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history"
   let historyRows = [];
   let expandedMonths = new Set();
   let historyMode = "month"; // "month" | "year"
@@ -129,19 +132,24 @@
     startPolling();
   }
 
-  // ---------- 탭 전환 (내역 목록 / 월별 히스토리) ----------
+  // ---------- 탭 전환 (작업 내역 / 소독 / 저수조 청소 / 히스토리) ----------
 
   function switchTab(tab) {
     activeTab = tab;
-    tabListBtn.classList.toggle("tab-active", tab === "list");
-    tabHistoryBtn.classList.toggle("tab-active", tab === "history");
-    listSection.classList.toggle("hidden", tab !== "list");
-    historyView.classList.toggle("hidden", tab !== "history");
-    if (tab === "history") loadMonthlySummary();
+    tabBtns.forEach((btn) => btn.classList.toggle("tab-active", btn.dataset.tab === tab));
+    const isHistory = tab === "history";
+    listSection.classList.toggle("hidden", isHistory);
+    historyView.classList.toggle("hidden", !isHistory);
+    if (isHistory) {
+      loadMonthlySummary();
+    } else {
+      loadRecords();
+    }
   }
 
-  tabListBtn.addEventListener("click", () => switchTab("list"));
-  tabHistoryBtn.addEventListener("click", () => switchTab("history"));
+  tabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+  });
 
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -262,6 +270,7 @@
 
   async function loadRecords() {
     const params = new URLSearchParams();
+    params.set("category", CATEGORIES.includes(activeTab) ? activeTab : CATEGORIES[0]);
     if (filterSite.value) params.set("site", filterSite.value);
     if (filterMonth.value) params.set("month", filterMonth.value);
     const data = await api(`/api/records?${params.toString()}`);
@@ -527,6 +536,7 @@
           paid: newPaid.checked,
           paid_date: newPaidDate.value || null,
           bank_account: newBankAccount.value || "",
+          category: CATEGORIES.includes(activeTab) ? activeTab : CATEGORIES[0],
         }),
       });
       addForm.classList.add("hidden");
@@ -559,10 +569,19 @@
     expandedMonths.clear();
     renderHistory();
   });
+  historyFilterCategory.addEventListener("change", () => {
+    expandedMonths.clear();
+    renderHistory();
+  });
 
   function renderHistory() {
     const siteFilter = historyFilterSite.value;
-    const filteredRows = siteFilter ? historyRows.filter((r) => r.site_name === siteFilter) : historyRows;
+    const categoryFilter = historyFilterCategory.value;
+    const filteredRows = historyRows.filter((r) => {
+      if (siteFilter && r.site_name !== siteFilter) return false;
+      if (categoryFilter && r.category !== categoryFilter) return false;
+      return true;
+    });
 
     if (filteredRows.length === 0) {
       historyBody.innerHTML = "";
@@ -653,11 +672,11 @@
       return;
     }
 
-    // 월 행 클릭 -> 내역 목록 탭으로 이동해서 해당 월(및 현장 필터 중이면 그 현장)로 필터링
+    // 월 행 클릭 -> 해당 구분 탭으로 이동해서 그 월(및 현장 필터 중이면 그 현장)로 필터링
+    // (히스토리에서 구분을 선택하지 않은 상태라면 기본으로 "작업내역" 탭으로 이동합니다)
     filterMonth.value = period;
     filterSite.value = historyFilterSite.value || "";
-    switchTab("list");
-    loadRecords();
+    switchTab(historyFilterCategory.value || "작업내역");
   });
 
   function escapeHtml(str) {
