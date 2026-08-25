@@ -121,7 +121,7 @@ input:focus, select:focus {
 
 /* ---------- 앱 레이아웃 ---------- */
 .app-wrap {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 20px 16px 60px;
 }
