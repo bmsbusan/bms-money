@@ -177,6 +177,7 @@ async function handleGetRecords(request, env) {
   const site = url.searchParams.get("site") || "";
   const month = url.searchParams.get("month") || ""; // YYYY-MM
   const category = url.searchParams.get("category") || "";
+  const keyword = url.searchParams.get("keyword") || "";
 
   let query = "SELECT * FROM records WHERE 1=1";
   const binds = [];
@@ -192,7 +193,16 @@ async function handleGetRecords(request, env) {
     query += " AND strftime('%Y-%m', COALESCE(work_date, created_at)) = ?";
     binds.push(month);
   }
-  query += " ORDER BY paid ASC, COALESCE(work_date, created_at) DESC, id DESC";
+  if (keyword) {
+    query += " AND (site_name LIKE ? OR content LIKE ?)";
+    const k = `%${keyword}%`;
+    binds.push(k, k);
+  }
+  // 키워드로 검색할 때는(작업내역 조회 페이지의 통합 검색) 입금 대기 우선 정렬 대신
+  // 단순 최신순으로 보여주는 편이 자연스럽습니다.
+  query += keyword
+    ? " ORDER BY COALESCE(work_date, created_at) DESC, id DESC"
+    : " ORDER BY paid ASC, COALESCE(work_date, created_at) DESC, id DESC";
 
   const stmt = env.DB.prepare(query).bind(...binds);
   const { results } = await stmt.all();

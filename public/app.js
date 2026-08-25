@@ -114,6 +114,7 @@
   const overviewModeYearBtn = $("#overviewModeYearBtn");
   const overviewPeriodHeader = $("#overviewPeriodHeader");
   const overviewFilterSite = $("#overviewFilterSite");
+  const overviewFilterType = $("#overviewFilterType");
   const overviewSearchInput = $("#overviewSearchInput");
   const overviewSearchBtn = $("#overviewSearchBtn");
   const overviewSearchResetBtn = $("#overviewSearchResetBtn");
@@ -149,6 +150,7 @@
   let overviewMode = "month"; // "month" | "year"
   let overviewExpandedPeriods = new Set();
   let overviewSearching = false;
+  let overviewDrilldownMonth = ""; // 월별 집계에서 현장별 상세를 눌러 들어왔을 때의 월(YYYY-MM)
 
   const won = (n) => (Number(n) || 0).toLocaleString("ko-KR") + "원";
 
@@ -946,7 +948,7 @@
     }
   });
 
-  // ---- 주간 / 월간 시설 작업일지 엑셀 다운로드 ----
+  // ---- 주간 / 월간 시설 작업일지 엑셀 다운로드 (회사 공식 양식 그대로 재현) ----
 
   function isoWeekToRange(weekStr) {
     // weekStr: "YYYY-Www" (예: "2026-W35") -> 그 주의 월요일 ~ 일요일 날짜 범위 (ISO 8601 기준)
@@ -966,27 +968,377 @@
     return { from: fmt(monday), to: fmt(sunday), label: `${fmt(monday)} ~ ${fmt(sunday)}` };
   }
 
-  function buildJournalWorkbook(rows, title, filename) {
-    if (typeof XLSX === "undefined") {
-      throw new Error("엑셀 생성 라이브러리를 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.");
-    }
-    const aoa = [];
-    aoa.push([`비엠에스코리아 부산지사 ${title}`]);
-    aoa.push([]);
-    aoa.push(["번호", "작업일", "현장명", "작업내역", "비고"]);
-    rows.forEach((r, i) => {
-      aoa.push([i + 1, r.work_date || "", r.site_name || "", r.content || "", r.remarks || ""]);
+  // ===== 엑셀 스타일 상수 (비엠에스코리아 부산지사 공식 "시설 관리 작업일지" 양식 기준) =====
+  const XLS_FONT = "맑은 고딕";
+  const XLS_NAVY = "FF1F3864";
+  const XLS_GRAY_TEXT = "FF404040";
+  const XLS_WHITE = "FFFFFFFF";
+  const XLS_HEADER_FILL = "FF2F5597";
+  const XLS_BAR_FILL = "FF1F3864";
+  const XLS_LABEL_FILL = "FFD9E2F3";
+  const XLS_SAT_FILL = "FFEAF1FB";
+  const XLS_SAT_TEXT = "FF1F4E79";
+  const XLS_SUN_FILL = "FFFDECEC";
+  const XLS_SUN_TEXT = "FFC00000";
+  const XLS_NOTE_FILL = "FFF2F2F2";
+  const XLS_WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
+  const XLS_THIN = { style: "thin" };
+  const XLS_MED = { style: "medium" };
+  const XLS_HAIR = { style: "hair" };
+  const xlsAllThin = () => ({ top: XLS_THIN, bottom: XLS_THIN, left: XLS_THIN, right: XLS_THIN });
+
+  function xlsStyleCell(cell, opts) {
+    const { size = 10, bold = false, color = "FF000000", fill, align = "left", valign = "center", wrap = false, border } = opts || {};
+    cell.font = { name: XLS_FONT, size, bold, color: { argb: color } };
+    cell.alignment = { horizontal: align, vertical: valign, wrapText: !!wrap };
+    if (fill) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } };
+    if (border) cell.border = border;
+  }
+
+  function xlsDayStyle(dow) {
+    // dow: 0=일 ... 6=토 (JS Date.getUTCDay 기준)
+    if (dow === 0) return { fill: XLS_SUN_FILL, text: XLS_SUN_TEXT, bold: true };
+    if (dow === 6) return { fill: XLS_SAT_FILL, text: XLS_SAT_TEXT, bold: true };
+    return { fill: XLS_WHITE, text: "FF000000", bold: false };
+  }
+
+  function groupJournalByDate(rows) {
+    const map = new Map();
+    (rows || []).forEach((r) => {
+      const d = r.work_date || "";
+      if (!map.has(d)) map.set(d, []);
+      map.get(d).push(r);
     });
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }];
-    ws["!cols"] = [{ wch: 6 }, { wch: 13 }, { wch: 20 }, { wch: 55 }, { wch: 30 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "작업일지");
-    XLSX.writeFile(wb, filename);
+    return map;
+  }
+
+  function combineJournalDay(entriesForDay) {
+    if (!entriesForDay || entriesForDay.length === 0) return { site: "", content: "", remarks: "" };
+    if (entriesForDay.length === 1) {
+      const e = entriesForDay[0];
+      return { site: e.site_name || "", content: e.content || "", remarks: e.remarks || "" };
+    }
+    return {
+      site: entriesForDay.map((e, i) => `${i + 1}) ${e.site_name || ""}`).join("\n"),
+      content: entriesForDay.map((e, i) => `${i + 1}) ${e.content || ""}`).join("\n"),
+      remarks: entriesForDay.some((e) => e.remarks)
+        ? entriesForDay.map((e, i) => `${i + 1}) ${e.remarks || "-"}`).join("\n")
+        : "",
+    };
+  }
+
+  function buildMonthWeekBlocks(year, month) {
+    // month: 1~12. 해당 월의 날짜들을 "월요일 시작" 주 단위로 묶는다 (마지막 주는 월말에서 자름).
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const blocks = [];
+    let current = [];
+    for (let d = 1; d <= lastDay; d++) {
+      const dow = new Date(Date.UTC(year, month - 1, d)).getUTCDay();
+      current.push({ y: year, m: month, d, dow });
+      if (dow === 0 || d === lastDay) {
+        blocks.push(current);
+        current = [];
+      }
+    }
+    return blocks;
+  }
+
+  async function xlsDownloadBlob(workbook, filename) {
+    const buf = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buf], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // ---- 월간 시설 작업일지 (한 시트에 그 달 전체 주차별 표) ----
+  async function buildMonthlyJournalWorkbook(rows, year, month, siteLabel) {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("작업일지", { views: [{ showGridLines: false }] });
+    ws.columns = [{ width: 11.5 }, { width: 18 }, { width: 30 }, { width: 13 }];
+    const byDate = groupJournalByDate(rows);
+
+    let r = 1;
+    ws.mergeCells(r, 1, r, 4);
+    ws.getCell(r, 1).value = "시 설 관 리 작 업 일 지";
+    xlsStyleCell(ws.getCell(r, 1), { size: 18, bold: true, color: XLS_NAVY, align: "center" });
+    ws.getRow(r).height = 34;
+    r++;
+
+    ws.mergeCells(r, 1, r, 4);
+    ws.getCell(r, 1).value = `${year}년 ${month}월${siteLabel ? `  (현장: ${siteLabel})` : ""}`;
+    xlsStyleCell(ws.getCell(r, 1), { size: 12, bold: true, color: XLS_GRAY_TEXT, align: "center" });
+    ws.getRow(r).height = 22;
+    r++;
+
+    r++; // 여백 줄
+
+    ws.mergeCells(r, 2, r, 4);
+    ws.getCell(r, 1).value = "소  속";
+    xlsStyleCell(ws.getCell(r, 1), { size: 10, bold: true, color: XLS_NAVY, fill: XLS_LABEL_FILL, align: "center", border: xlsAllThin() });
+    ws.getCell(r, 2).value = "비엠에스코리아 부산지사";
+    xlsStyleCell(ws.getCell(r, 2), { size: 10, bold: true, align: "left", border: xlsAllThin() });
+    ws.getRow(r).height = 21;
+    r++;
+
+    ws.mergeCells(r, 2, r, 4);
+    ws.getCell(r, 1).value = "작 성 자";
+    xlsStyleCell(ws.getCell(r, 1), { size: 10, bold: true, color: XLS_NAVY, fill: XLS_LABEL_FILL, align: "center", border: xlsAllThin() });
+    xlsStyleCell(ws.getCell(r, 2), { size: 10, bold: false, align: "left", border: xlsAllThin() });
+    ws.getRow(r).height = 21;
+    r++;
+
+    r++; // 여백 줄
+
+    const headers = ["날  짜", "현 장 명", "작 업 내 용", "비          고"];
+    headers.forEach((h, i) => {
+      const c = ws.getCell(r, i + 1);
+      c.value = h;
+      xlsStyleCell(c, {
+        size: 11, bold: true, color: XLS_WHITE, fill: XLS_HEADER_FILL, align: "center",
+        border: { top: XLS_MED, bottom: XLS_MED, left: i === 0 ? XLS_MED : XLS_THIN, right: i === headers.length - 1 ? XLS_MED : XLS_THIN },
+      });
+    });
+    ws.getRow(r).height = 24;
+    r++;
+
+    const blocks = buildMonthWeekBlocks(year, month);
+    blocks.forEach((block, idx) => {
+      const first = block[0];
+      const last = block[block.length - 1];
+      ws.mergeCells(r, 1, r, 4);
+      ws.getCell(r, 1).value = `제${idx + 1}주    ${first.m}/${first.d}(${XLS_WEEKDAY_KR[first.dow]})  ~  ${last.m}/${last.d}(${XLS_WEEKDAY_KR[last.dow]})`;
+      xlsStyleCell(ws.getCell(r, 1), {
+        size: 10.5, bold: true, color: XLS_WHITE, fill: XLS_BAR_FILL, align: "left",
+        border: { top: XLS_MED, bottom: XLS_MED, left: XLS_MED, right: XLS_THIN },
+      });
+      ws.getRow(r).height = 20;
+      r++;
+
+      block.forEach((day) => {
+        const ds = xlsDayStyle(day.dow);
+        const key = `${day.y}-${String(day.m).padStart(2, "0")}-${String(day.d).padStart(2, "0")}`;
+        const combo = combineJournalDay(byDate.get(key));
+
+        ws.getCell(r, 1).value = `${day.m}/${day.d} (${XLS_WEEKDAY_KR[day.dow]})`;
+        xlsStyleCell(ws.getCell(r, 1), {
+          size: 10, bold: ds.bold, color: ds.text, fill: ds.fill, align: "center",
+          border: { top: XLS_HAIR, bottom: XLS_HAIR, left: XLS_MED, right: XLS_THIN },
+        });
+        ws.getCell(r, 2).value = combo.site;
+        xlsStyleCell(ws.getCell(r, 2), {
+          size: 10, fill: ds.fill, align: "left", wrap: combo.site.includes("\n"),
+          border: { top: XLS_HAIR, bottom: XLS_HAIR, left: XLS_THIN, right: XLS_THIN },
+        });
+        ws.getCell(r, 3).value = combo.content;
+        xlsStyleCell(ws.getCell(r, 3), {
+          size: 10, fill: ds.fill, align: "left", wrap: true,
+          border: { top: XLS_HAIR, bottom: XLS_HAIR, left: XLS_THIN, right: XLS_THIN },
+        });
+        ws.getCell(r, 4).value = combo.remarks;
+        xlsStyleCell(ws.getCell(r, 4), {
+          size: 10, fill: ds.fill, align: "left", wrap: true,
+          border: { top: XLS_HAIR, bottom: XLS_HAIR, left: XLS_THIN, right: XLS_MED },
+        });
+        ws.getRow(r).height = 20;
+        r++;
+      });
+
+      ws.getCell(r, 1).value = "주간 특이사항";
+      xlsStyleCell(ws.getCell(r, 1), {
+        size: 9, bold: true, color: XLS_NAVY, fill: XLS_NOTE_FILL, align: "center",
+        border: { top: XLS_THIN, bottom: XLS_MED, left: XLS_MED, right: XLS_THIN },
+      });
+      ws.mergeCells(r, 2, r, 4);
+      xlsStyleCell(ws.getCell(r, 2), {
+        size: 11, align: "left", fill: XLS_NOTE_FILL, wrap: true,
+        border: { top: XLS_THIN, bottom: XLS_MED, left: XLS_THIN, right: XLS_THIN },
+      });
+      ws.getRow(r).height = 22;
+      r++;
+    });
+
+    r++; // 여백 줄
+
+    ws.mergeCells(r, 1, r, 4);
+    ws.getCell(r, 1).value = `${year}년        월        일`;
+    xlsStyleCell(ws.getCell(r, 1), { size: 11, bold: true, align: "center" });
+    ws.getRow(r).height = 26;
+    r++;
+
+    ws.mergeCells(r, 1, r, 4);
+    ws.getCell(r, 1).value = "비엠에스코리아 부산지사";
+    xlsStyleCell(ws.getCell(r, 1), { size: 13, bold: true, color: XLS_NAVY, align: "center" });
+    ws.getRow(r).height = 26;
+    r++;
+
+    r++; // 여백 줄
+
+    ws.getCell(r, 1).value = "작 성 자";
+    xlsStyleCell(ws.getCell(r, 1), { size: 9.5, bold: true, color: XLS_NAVY, fill: XLS_LABEL_FILL, align: "center", border: xlsAllThin() });
+    xlsStyleCell(ws.getCell(r, 2), { size: 11, align: "left", border: xlsAllThin() });
+    ws.getCell(r, 3).value = "대  표";
+    xlsStyleCell(ws.getCell(r, 3), { size: 9.5, bold: true, color: XLS_NAVY, fill: XLS_LABEL_FILL, align: "center", border: xlsAllThin() });
+    xlsStyleCell(ws.getCell(r, 4), { size: 11, align: "left", border: xlsAllThin() });
+    ws.getRow(r).height = 30;
+
+    return wb;
+  }
+
+  // ---- 주간 시설 작업일지 (선택한 한 주(월~일)만 상세하게 담은 표) ----
+  async function buildWeeklyJournalWorkbook(rows, range, siteLabel) {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("작업일지", { views: [{ showGridLines: false }] });
+    ws.columns = [{ width: 10.5 }, { width: 6.5 }, { width: 16.5 }, { width: 27 }, { width: 22.5 }];
+    const byDate = groupJournalByDate(rows);
+
+    const days = [];
+    const cursor = new Date(`${range.from}T00:00:00Z`);
+    const endD = new Date(`${range.to}T00:00:00Z`);
+    while (cursor <= endD) {
+      days.push({
+        y: cursor.getUTCFullYear(),
+        m: cursor.getUTCMonth() + 1,
+        d: cursor.getUTCDate(),
+        dow: cursor.getUTCDay(),
+        iso: cursor.toISOString().slice(0, 10),
+      });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    const first = days[0];
+    const last = days[days.length - 1];
+    const titleMonth = first.m === last.m ? `${first.y}년 ${first.m}월` : `${first.y}년 ${first.m}월~${last.m}월`;
+
+    let r = 1;
+    ws.mergeCells(r, 1, r, 5);
+    ws.getCell(r, 1).value = "시 설 관 리 작 업 일 지";
+    xlsStyleCell(ws.getCell(r, 1), { size: 20, bold: true, color: XLS_NAVY, align: "center" });
+    ws.getRow(r).height = 36;
+    r++;
+
+    ws.mergeCells(r, 1, r, 5);
+    ws.getCell(r, 1).value = `${titleMonth}  (${range.from} ~ ${range.to})${siteLabel ? `  현장: ${siteLabel}` : ""}`;
+    xlsStyleCell(ws.getCell(r, 1), { size: 13, bold: true, color: XLS_GRAY_TEXT, align: "center" });
+    ws.getRow(r).height = 24;
+    r++;
+
+    ws.mergeCells(r, 2, r, 5);
+    ws.getCell(r, 1).value = "소  속";
+    xlsStyleCell(ws.getCell(r, 1), { size: 10.5, bold: true, color: XLS_NAVY, fill: XLS_LABEL_FILL, align: "center", border: xlsAllThin() });
+    ws.getCell(r, 2).value = "비엠에스코리아 부산지사";
+    xlsStyleCell(ws.getCell(r, 2), { size: 10.5, bold: true, align: "left", border: xlsAllThin() });
+    ws.getRow(r).height = 22;
+    r++;
+
+    ws.mergeCells(r, 2, r, 5);
+    ws.getCell(r, 1).value = "작 성 자";
+    xlsStyleCell(ws.getCell(r, 1), { size: 10.5, bold: true, color: XLS_NAVY, fill: XLS_LABEL_FILL, align: "center", border: xlsAllThin() });
+    xlsStyleCell(ws.getCell(r, 2), { size: 10.5, align: "left", border: xlsAllThin() });
+    ws.getRow(r).height = 22;
+    r++;
+
+    ws.getRow(r).height = 8;
+    r++;
+
+    const headers = ["날  짜", "요일", "현 장 명", "작 업 내 용", "비          고"];
+    headers.forEach((h, i) => {
+      const c = ws.getCell(r, i + 1);
+      c.value = h;
+      xlsStyleCell(c, {
+        size: 11.5, bold: true, color: XLS_WHITE, fill: XLS_HEADER_FILL, align: "center",
+        border: { top: XLS_MED, bottom: XLS_MED, left: i === 0 ? XLS_MED : XLS_THIN, right: i === headers.length - 1 ? XLS_MED : XLS_THIN },
+      });
+    });
+    ws.getRow(r).height = 28;
+    r++;
+
+    ws.mergeCells(r, 1, r, 5);
+    ws.getCell(r, 1).value = `${first.m}. ${first.d}(${XLS_WEEKDAY_KR[first.dow]})   ~   ${last.m}. ${last.d}(${XLS_WEEKDAY_KR[last.dow]})`;
+    xlsStyleCell(ws.getCell(r, 1), {
+      size: 12, bold: true, color: XLS_WHITE, fill: XLS_BAR_FILL, align: "left",
+      border: { top: XLS_MED, bottom: XLS_MED, left: XLS_MED, right: XLS_THIN },
+    });
+    ws.getRow(r).height = 28;
+    r++;
+
+    days.forEach((day) => {
+      const isWeekend = day.dow === 0 || day.dow === 6;
+      const ds = xlsDayStyle(day.dow);
+      const combo = combineJournalDay(byDate.get(day.iso));
+
+      ws.getCell(r, 1).value = `${day.m} / ${day.d}`;
+      xlsStyleCell(ws.getCell(r, 1), {
+        size: 12, bold: ds.bold, color: ds.text, fill: ds.fill, align: "center",
+        border: { top: XLS_THIN, bottom: XLS_THIN, left: XLS_MED, right: XLS_THIN },
+      });
+      ws.getCell(r, 2).value = XLS_WEEKDAY_KR[day.dow];
+      xlsStyleCell(ws.getCell(r, 2), {
+        size: isWeekend ? 12 : 11, bold: isWeekend, color: ds.text, fill: ds.fill, align: "center",
+        border: { top: XLS_THIN, bottom: XLS_THIN, left: XLS_THIN, right: XLS_THIN },
+      });
+      ws.getCell(r, 3).value = combo.site;
+      xlsStyleCell(ws.getCell(r, 3), {
+        size: 11, fill: ds.fill, align: "center", wrap: combo.site.includes("\n"),
+        border: { top: XLS_THIN, bottom: XLS_THIN, left: XLS_THIN, right: XLS_THIN },
+      });
+      ws.getCell(r, 4).value = combo.content;
+      xlsStyleCell(ws.getCell(r, 4), {
+        size: 11, fill: ds.fill, align: "left", valign: "top", wrap: true,
+        border: { top: XLS_THIN, bottom: XLS_THIN, left: XLS_THIN, right: XLS_THIN },
+      });
+      ws.getCell(r, 5).value = combo.remarks;
+      xlsStyleCell(ws.getCell(r, 5), {
+        size: 11, fill: ds.fill, align: "left", valign: "top", wrap: true,
+        border: { top: XLS_THIN, bottom: XLS_THIN, left: XLS_THIN, right: XLS_MED },
+      });
+      ws.getRow(r).height = 72;
+      r++;
+    });
+
+    ws.getCell(r, 1).value = "주간\n특이사항";
+    xlsStyleCell(ws.getCell(r, 1), {
+      size: 10, bold: true, color: XLS_NAVY, fill: XLS_NOTE_FILL, align: "center", wrap: true,
+      border: { top: XLS_MED, bottom: XLS_THIN, left: XLS_MED, right: XLS_THIN },
+    });
+    ws.mergeCells(r, 2, r, 5);
+    xlsStyleCell(ws.getCell(r, 2), {
+      size: 11, align: "left", valign: "top", wrap: true, fill: XLS_NOTE_FILL,
+      border: { top: XLS_MED, bottom: XLS_THIN, left: XLS_THIN, right: XLS_THIN },
+    });
+    ws.getRow(r).height = 62;
+    r++;
+
+    ws.getCell(r, 1).value = "작 성 자";
+    xlsStyleCell(ws.getCell(r, 1), {
+      size: 10, bold: true, color: XLS_NAVY, fill: XLS_LABEL_FILL, align: "center",
+      border: { top: XLS_THIN, bottom: XLS_MED, left: XLS_MED, right: XLS_THIN },
+    });
+    xlsStyleCell(ws.getCell(r, 2), { size: 11, align: "left", border: { top: XLS_THIN, bottom: XLS_MED, left: XLS_THIN, right: XLS_THIN } });
+    ws.getCell(r, 3).value = "대     표";
+    xlsStyleCell(ws.getCell(r, 3), {
+      size: 10, bold: true, color: XLS_NAVY, fill: XLS_LABEL_FILL, align: "center",
+      border: { top: XLS_THIN, bottom: XLS_MED, left: XLS_THIN, right: XLS_THIN },
+    });
+    ws.mergeCells(r, 4, r, 5);
+    xlsStyleCell(ws.getCell(r, 4), { size: 11, align: "left", border: { top: XLS_THIN, bottom: XLS_MED, left: XLS_THIN, right: XLS_MED } });
+    ws.getRow(r).height = 36;
+
+    return wb;
   }
 
   downloadWeeklyBtn.addEventListener("click", async () => {
     exportError.textContent = "";
+    if (typeof ExcelJS === "undefined") {
+      exportError.textContent = "엑셀 생성 라이브러리를 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.";
+      return;
+    }
     const range = isoWeekToRange(journalWeekPicker.value);
     if (!range) { exportError.textContent = "다운로드할 주(week)를 선택해주세요."; return; }
     try {
@@ -997,7 +1349,8 @@
         exportError.textContent = "선택한 주간에 등록된 업무일지가 없습니다.";
         return;
       }
-      buildJournalWorkbook(data.entries, `주간 시설 작업일지 (${range.label})`, `주간시설작업일지_${range.from}_${range.to}.xlsx`);
+      const wb = await buildWeeklyJournalWorkbook(data.entries, range, journalFilterSite.value || "");
+      await xlsDownloadBlob(wb, `주간시설작업일지_${range.from}_${range.to}.xlsx`);
     } catch (err) {
       exportError.textContent = err.message;
     }
@@ -1005,6 +1358,10 @@
 
   downloadMonthlyBtn.addEventListener("click", async () => {
     exportError.textContent = "";
+    if (typeof ExcelJS === "undefined") {
+      exportError.textContent = "엑셀 생성 라이브러리를 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.";
+      return;
+    }
     const month = journalMonthPicker.value; // "YYYY-MM"
     if (!month) { exportError.textContent = "다운로드할 월을 선택해주세요."; return; }
     try {
@@ -1015,7 +1372,9 @@
         exportError.textContent = "선택한 월에 등록된 업무일지가 없습니다.";
         return;
       }
-      buildJournalWorkbook(data.entries, `월간 시설 작업일지 (${month})`, `월간시설작업일지_${month}.xlsx`);
+      const [y, m] = month.split("-").map(Number);
+      const wb = await buildMonthlyJournalWorkbook(data.entries, y, m, journalFilterSite.value || "");
+      await xlsDownloadBlob(wb, `월간시설작업일지_${month}.xlsx`);
     } catch (err) {
       exportError.textContent = err.message;
     }
@@ -1190,7 +1549,11 @@
     }
   });
 
-  // ================= 작업내역 조회 (월별/연간 통합 + 현장/키워드 검색) =================
+  // ================= 작업 내역 및 시설 업무일지 조회 (월별/연간 통합 + 검색) =================
+  // "청구 작업내역"(records 표, category=작업내역)과 "시설 업무일지"(journal_entries 표)를
+  // 한 화면에서 같이 집계/검색할 수 있게 합니다.
+
+  const OVERVIEW_RECORD_CATEGORY = "작업내역";
 
   async function loadOverview() {
     if (overviewSearching) {
@@ -1201,8 +1564,17 @@
   }
 
   async function loadOverviewSummary() {
-    const data = await api("/api/journal-summary");
-    overviewSummaryRows = data.rows || [];
+    const [journalData, recordData] = await Promise.all([
+      api("/api/journal-summary"),
+      api("/api/monthly-summary"),
+    ]);
+    const journalRows = (journalData.rows || []).map((r) => ({
+      month: r.month, site_name: r.site_name, count: r.count, source: "journal",
+    }));
+    const recordRows = (recordData.rows || [])
+      .filter((r) => r.category === OVERVIEW_RECORD_CATEGORY)
+      .map((r) => ({ month: r.month, site_name: r.site_name, count: r.count, source: "record" }));
+    overviewSummaryRows = [...journalRows, ...recordRows];
     renderOverviewSummary();
   }
 
@@ -1224,13 +1596,27 @@
       renderOverviewSummary();
     }
   });
+  overviewFilterType.addEventListener("change", () => {
+    if (overviewSearching) {
+      runOverviewSearch();
+    } else {
+      overviewExpandedPeriods.clear();
+      renderOverviewSummary();
+    }
+  });
 
   function renderOverviewSummary() {
     overviewSearchTable.classList.add("hidden");
     overviewTable.classList.remove("hidden");
 
     const siteFilter = overviewFilterSite.value;
-    const filteredRows = overviewSummaryRows.filter((r) => !siteFilter || r.site_name === siteFilter);
+    const typeFilter = overviewFilterType.value; // "all" | "record" | "journal"
+    const filteredRows = overviewSummaryRows.filter((r) => {
+      if (siteFilter && r.site_name !== siteFilter) return false;
+      if (typeFilter === "record" && r.source !== "record") return false;
+      if (typeFilter === "journal" && r.source !== "journal") return false;
+      return true;
+    });
 
     if (filteredRows.length === 0) {
       overviewBody.innerHTML = "";
@@ -1244,12 +1630,17 @@
       const m = row.month || "미상";
       const key = overviewMode === "year" ? (m.slice(0, 4) || "미상") : m;
       if (!byPeriod.has(key)) {
-        byPeriod.set(key, { period: key, count: 0, sitesMap: new Map() });
+        byPeriod.set(key, { period: key, recordCount: 0, journalCount: 0, sitesMap: new Map() });
       }
       const bucket = byPeriod.get(key);
-      bucket.count += row.count;
-      const s = bucket.sitesMap.get(row.site_name) || { site_name: row.site_name, count: 0 };
-      s.count += row.count;
+      const s = bucket.sitesMap.get(row.site_name) || { site_name: row.site_name, recordCount: 0, journalCount: 0 };
+      if (row.source === "record") {
+        bucket.recordCount += row.count;
+        s.recordCount += row.count;
+      } else {
+        bucket.journalCount += row.count;
+        s.journalCount += row.count;
+      }
       bucket.sitesMap.set(row.site_name, s);
     }
 
@@ -1259,16 +1650,20 @@
       .map((m) => {
         const isExpanded = overviewExpandedPeriods.has(m.period);
         const siteRows = Array.from(m.sitesMap.values()).sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
+        const total = m.recordCount + m.journalCount;
         const detailRows = isExpanded
           ? siteRows
-              .map(
-                (s, i) => `
+              .map((s, i) => {
+                const siteTotal = s.recordCount + s.journalCount;
+                return `
               <tr class="site-detail-row ${i === siteRows.length - 1 ? "last-detail" : ""}" data-period="${m.period}" data-site="${escapeHtml(s.site_name)}">
                 <td class="site-detail-name" data-label="현장명"><span class="cell-value">${escapeHtml(s.site_name)}</span></td>
-                <td class="col-cost" data-label="작업 건수"><span class="cell-value">${s.count}건</span></td>
+                <td class="col-cost" data-label="청구 작업내역 건수"><span class="cell-value">${s.recordCount}건</span></td>
+                <td class="col-cost" data-label="시설 업무일지 건수"><span class="cell-value">${s.journalCount}건</span></td>
+                <td class="col-cost" data-label="합계 건수"><span class="cell-value">${siteTotal}건</span></td>
                 <td class="col-cost" data-label="참여 현장 수"><span class="cell-value">-</span></td>
-              </tr>`
-              )
+              </tr>`;
+              })
               .join("")
           : "";
         const periodLabel = overviewMode === "year" ? m.period + "년" : m.period;
@@ -1277,7 +1672,9 @@
             <td class="period-cell" data-label="${overviewMode === "year" ? "연도" : "월"}">
               <span class="expand-icon">▶</span><span class="cell-value">${escapeHtml(periodLabel)}</span><span class="period-hint">${isExpanded ? "접기" : "현장별 보기"}</span>
             </td>
-            <td class="col-cost" data-label="작업 건수"><span class="cell-value">${m.count}건</span></td>
+            <td class="col-cost" data-label="청구 작업내역 건수"><span class="cell-value">${m.recordCount}건</span></td>
+            <td class="col-cost" data-label="시설 업무일지 건수"><span class="cell-value">${m.journalCount}건</span></td>
+            <td class="col-cost" data-label="합계 건수"><span class="cell-value">${total}건</span></td>
             <td class="col-cost" data-label="참여 현장 수"><span class="cell-value">${m.sitesMap.size}곳</span></td>
           </tr>
           ${detailRows}`;
@@ -1289,9 +1686,9 @@
     const detail = e.target.closest(".site-detail-row");
     if (detail) {
       if (overviewMode === "year") return;
-      journalFilterSite.value = detail.getAttribute("data-site") || "";
-      journalFilterMonth.value = detail.getAttribute("data-period") || "";
-      switchTab("journal");
+      const site = detail.getAttribute("data-site") || "";
+      const period = detail.getAttribute("data-period") || "";
+      drilldownOverview(site, period);
       return;
     }
     const row = e.target.closest(".month-row");
@@ -1302,14 +1699,72 @@
     renderOverviewSummary();
   });
 
-  async function runOverviewSearch() {
+  // 현장별 상세 줄을 누르면, 그 현장·그 달의 실제 내역(청구 작업내역 + 시설 업무일지)을
+  // 검색 결과와 같은 형태로 바로 보여줍니다.
+  async function drilldownOverview(site, month) {
+    overviewSearching = true;
+    overviewFilterSite.value = site;
+    overviewSearchInput.value = "";
+    await runOverviewSearch({ month });
+  }
+
+  async function fetchOverviewEntries({ keyword = "", month = "" } = {}) {
+    const typeFilter = overviewFilterType.value; // "all" | "record" | "journal"
+    const site = overviewFilterSite.value;
+    const tasks = [];
+
+    if (typeFilter !== "record") {
+      const params = new URLSearchParams({ sort: "desc" });
+      if (keyword) params.set("keyword", keyword);
+      if (site) params.set("site", site);
+      if (month) params.set("month", month);
+      tasks.push(
+        api(`/api/journal?${params.toString()}`).then((data) =>
+          (data.entries || []).map((r) => ({
+            work_date: r.work_date,
+            site_name: r.site_name,
+            source: "journal",
+            content: r.content,
+            note: r.remarks,
+          }))
+        )
+      );
+    }
+    if (typeFilter !== "journal") {
+      const params = new URLSearchParams({ category: OVERVIEW_RECORD_CATEGORY });
+      if (keyword) params.set("keyword", keyword);
+      if (site) params.set("site", site);
+      if (month) params.set("month", month);
+      tasks.push(
+        api(`/api/records?${params.toString()}`).then((data) =>
+          (data.records || []).map((r) => ({
+            work_date: r.work_date,
+            site_name: r.site_name,
+            source: "record",
+            content: r.content,
+            note: `${won(r.cost)} · 청구${r.billed ? "완료" : "대기"} · 입금${r.paid ? "완료" : "대기"}`,
+          }))
+        )
+      );
+    }
+
+    const lists = await Promise.all(tasks);
+    return lists.flat().sort((a, b) => {
+      const av = a.work_date || "";
+      const bv = b.work_date || "";
+      if (!av && !bv) return 0;
+      if (!av) return 1;
+      if (!bv) return -1;
+      return av < bv ? 1 : av > bv ? -1 : 0;
+    });
+  }
+
+  async function runOverviewSearch(opts = {}) {
     const keyword = overviewSearchInput.value.trim();
-    const params = new URLSearchParams({ sort: "desc" });
-    if (keyword) params.set("keyword", keyword);
-    if (overviewFilterSite.value) params.set("site", overviewFilterSite.value);
-    const data = await api(`/api/journal?${params.toString()}`);
-    overviewSearchResults = data.entries || [];
-    renderOverviewSearch(keyword);
+    const month = opts.month !== undefined ? opts.month : overviewDrilldownMonth;
+    overviewDrilldownMonth = month;
+    overviewSearchResults = await fetchOverviewEntries({ keyword, month });
+    renderOverviewSearch(keyword, month);
   }
 
   function highlightKeyword(text, keyword) {
@@ -1319,14 +1774,24 @@
     return (escaped || "-").replace(new RegExp(escapedKeyword, "gi"), (m) => `<mark>${m}</mark>`);
   }
 
-  function renderOverviewSearch(keyword) {
+  function sourceBadgeHtml(source) {
+    return source === "record"
+      ? `<span class="source-badge source-record">청구 작업내역</span>`
+      : `<span class="source-badge source-journal">시설 업무일지</span>`;
+  }
+
+  function renderOverviewSearch(keyword, month) {
     overviewTable.classList.add("hidden");
     overviewSearchTable.classList.remove("hidden");
 
     overviewSearchHint.classList.remove("hidden");
-    overviewSearchHint.textContent = keyword
-      ? `"${keyword}" 검색 결과 ${overviewSearchResults.length}건`
-      : `전체 업무일지 ${overviewSearchResults.length}건`;
+    if (keyword) {
+      overviewSearchHint.textContent = `"${keyword}" 검색 결과 ${overviewSearchResults.length}건`;
+    } else if (month) {
+      overviewSearchHint.textContent = `${overviewFilterSite.value || "전체 현장"} · ${month} 전체 내역 ${overviewSearchResults.length}건`;
+    } else {
+      overviewSearchHint.textContent = `전체 내역 ${overviewSearchResults.length}건`;
+    }
 
     if (overviewSearchResults.length === 0) {
       overviewSearchBody.innerHTML = "";
@@ -1340,9 +1805,10 @@
         (r) => `
         <tr>
           <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+          <td data-label="구분"><span class="cell-value">${sourceBadgeHtml(r.source)}</span></td>
           <td class="site-badge" data-label="현장명"><span class="cell-value">${highlightKeyword(r.site_name, keyword)}</span></td>
-          <td class="content-cell-wide" data-label="작업내역"><span class="cell-value">${highlightKeyword(r.content, keyword)}</span></td>
-          <td class="content-cell-wide" data-label="비고"><span class="cell-value">${highlightKeyword(r.remarks, keyword)}</span></td>
+          <td class="content-cell-wide" data-label="작업내용"><span class="cell-value">${highlightKeyword(r.content, keyword)}</span></td>
+          <td class="content-cell-wide" data-label="비고"><span class="cell-value">${r.source === "journal" ? highlightKeyword(r.note, keyword) : escapeHtml(r.note)}</span></td>
         </tr>`
       )
       .join("");
@@ -1350,18 +1816,22 @@
 
   overviewSearchBtn.addEventListener("click", async () => {
     overviewSearching = true;
-    await runOverviewSearch();
+    await runOverviewSearch({ month: "" });
   });
   overviewSearchInput.addEventListener("keydown", async (e) => {
     if (e.key === "Enter") {
       overviewSearching = true;
-      await runOverviewSearch();
+      await runOverviewSearch({ month: "" });
     }
   });
   overviewSearchResetBtn.addEventListener("click", async () => {
     overviewSearching = false;
+    overviewDrilldownMonth = "";
     overviewSearchInput.value = "";
+    overviewFilterSite.value = "";
+    overviewFilterType.value = "all";
     overviewSearchHint.classList.add("hidden");
+    overviewExpandedPeriods.clear();
     await loadOverviewSummary();
   });
 

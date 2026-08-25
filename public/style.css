@@ -345,6 +345,18 @@ td.col-date { white-space: nowrap; }
 .col-remarks { min-width: 160px; }
 mark { background: #fff3a3; color: inherit; border-radius: 3px; padding: 0 2px; }
 
+/* 작업 내역 및 시설 업무일지 조회: 검색 결과의 "구분" 배지 */
+.source-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.source-badge.source-journal { background: var(--navy-soft-bg); color: var(--navy-soft-text); }
+.source-badge.source-record { background: #fdf1e0; color: var(--num-brown); }
+
 /* 현장명 칸.
    예전에는 display:inline-block 이 걸려 있어서 이 칸만 표의 셀에서 빠져나와
    같은 줄의 다른 칸(작업일, 내용)과 위아래 정렬이 어긋나 보였습니다.
