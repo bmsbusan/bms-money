@@ -47,3 +47,38 @@ INSERT OR IGNORE INTO sites (name, sort_order) VALUES
   ('송도타워', 20),
   ('창원비룡1,2차', 21),
   ('범일골드빌', 22);
+
+-- ============================================================
+-- 업무일지 (일일 작업 기록: 현장명 / 작업내역 / 비고)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS journal_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  work_date TEXT NOT NULL,             -- 작업 날짜 YYYY-MM-DD
+  site_name TEXT NOT NULL,
+  content TEXT DEFAULT '',             -- 작업내역
+  remarks TEXT DEFAULT '',             -- 비고
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_journal_site ON journal_entries(site_name);
+CREATE INDEX IF NOT EXISTS idx_journal_date ON journal_entries(work_date);
+
+-- ============================================================
+-- 후속 작업 (앞으로 진행해야 하는 업무 등록 / 조회)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS followups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  site_name TEXT NOT NULL,
+  content TEXT DEFAULT '',             -- 처리해야 할 내용
+  due_date TEXT,                       -- 예정일 YYYY-MM-DD (선택)
+  status INTEGER NOT NULL DEFAULT 0,   -- 0: 대기(미완료), 1: 완료
+  remarks TEXT DEFAULT '',             -- 비고
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  completed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_followups_site ON followups(site_name);
+CREATE INDEX IF NOT EXISTS idx_followups_status ON followups(status);
+CREATE INDEX IF NOT EXISTS idx_followups_due ON followups(due_date);

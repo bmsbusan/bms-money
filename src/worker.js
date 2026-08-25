@@ -287,6 +287,260 @@ async function handleDeleteRecord(id, env) {
   return json({ ok: true });
 }
 
+// ---- 업무일지 (journal_entries) ----
+
+function rowToJournal(row) {
+  return {
+    id: row.id,
+    work_date: row.work_date,
+    site_name: row.site_name,
+    content: row.content || "",
+    remarks: row.remarks || "",
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function handleGetJournal(request, env) {
+  const url = new URL(request.url);
+  const site = url.searchParams.get("site") || "";
+  const month = url.searchParams.get("month") || ""; // YYYY-MM
+  const from = url.searchParams.get("from") || "";   // YYYY-MM-DD
+  const to = url.searchParams.get("to") || "";        // YYYY-MM-DD
+  const keyword = url.searchParams.get("keyword") || "";
+  const sort = url.searchParams.get("sort") === "asc" ? "ASC" : "DESC";
+
+  let query = "SELECT * FROM journal_entries WHERE 1=1";
+  const binds = [];
+  if (site) {
+    query += " AND site_name = ?";
+    binds.push(site);
+  }
+  if (month) {
+    query += " AND strftime('%Y-%m', work_date) = ?";
+    binds.push(month);
+  }
+  if (from) {
+    query += " AND work_date >= ?";
+    binds.push(from);
+  }
+  if (to) {
+    query += " AND work_date <= ?";
+    binds.push(to);
+  }
+  if (keyword) {
+    query += " AND (site_name LIKE ? OR content LIKE ? OR remarks LIKE ?)";
+    const k = `%${keyword}%`;
+    binds.push(k, k, k);
+  }
+  query += ` ORDER BY work_date ${sort}, id ${sort}`;
+
+  const stmt = env.DB.prepare(query).bind(...binds);
+  const { results } = await stmt.all();
+  return json({ entries: results.map(rowToJournal) });
+}
+
+async function handleCreateJournal(request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+  const site_name = typeof body.site_name === "string" ? body.site_name.trim() : "";
+  const work_date = typeof body.work_date === "string" && body.work_date ? body.work_date : "";
+  const content = typeof body.content === "string" ? body.content.trim() : "";
+  const remarks = typeof body.remarks === "string" ? body.remarks.trim() : "";
+
+  if (!site_name) return badRequest("현장명을 선택해주세요.");
+  if (!work_date) return badRequest("작업 날짜를 선택해주세요.");
+
+  const result = await env.DB.prepare(
+    `INSERT INTO journal_entries (work_date, site_name, content, remarks, created_at, updated_at)
+     VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))`
+  )
+    .bind(work_date, site_name, content, remarks)
+    .run();
+
+  return json({ ok: true, id: result.meta.last_row_id });
+}
+
+async function handleUpdateJournal(id, request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+
+  const fields = [];
+  const binds = [];
+
+  if (typeof body.site_name === "string") {
+    fields.push("site_name = ?");
+    binds.push(body.site_name.trim());
+  }
+  if (body.work_date !== undefined) {
+    fields.push("work_date = ?");
+    binds.push(body.work_date || "");
+  }
+  if (typeof body.content === "string") {
+    fields.push("content = ?");
+    binds.push(body.content.trim());
+  }
+  if (typeof body.remarks === "string") {
+    fields.push("remarks = ?");
+    binds.push(body.remarks.trim());
+  }
+
+  if (fields.length === 0) return badRequest("수정할 내용이 없습니다.");
+
+  fields.push("updated_at = datetime('now')");
+  binds.push(id);
+
+  await env.DB.prepare(`UPDATE journal_entries SET ${fields.join(", ")} WHERE id = ?`)
+    .bind(...binds)
+    .run();
+
+  return json({ ok: true });
+}
+
+async function handleDeleteJournal(id, env) {
+  await env.DB.prepare("DELETE FROM journal_entries WHERE id = ?").bind(id).run();
+  return json({ ok: true });
+}
+
+async function handleJournalSummary(env) {
+  // 월 + 현장별 작업 건수 집계 (프론트에서 월별/연도별로 다시 묶어서 보여줍니다)
+  const { results } = await env.DB.prepare(
+    `SELECT
+       strftime('%Y-%m', work_date) AS month,
+       site_name,
+       COUNT(*) AS count
+     FROM journal_entries
+     GROUP BY month, site_name
+     ORDER BY month DESC, site_name ASC`
+  ).all();
+  return json({ rows: results });
+}
+
+// ---- 후속 작업 (followups) ----
+
+function rowToFollowup(row) {
+  return {
+    id: row.id,
+    site_name: row.site_name,
+    content: row.content || "",
+    due_date: row.due_date || null,
+    status: !!row.status,
+    remarks: row.remarks || "",
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    completed_at: row.completed_at || null,
+  };
+}
+
+async function handleGetFollowups(request, env) {
+  const url = new URL(request.url);
+  const site = url.searchParams.get("site") || "";
+  const status = url.searchParams.get("status") || ""; // "0" | "1" | ""
+  const keyword = url.searchParams.get("keyword") || "";
+
+  let query = "SELECT * FROM followups WHERE 1=1";
+  const binds = [];
+  if (site) {
+    query += " AND site_name = ?";
+    binds.push(site);
+  }
+  if (status === "0" || status === "1") {
+    query += " AND status = ?";
+    binds.push(Number(status));
+  }
+  if (keyword) {
+    query += " AND (site_name LIKE ? OR content LIKE ? OR remarks LIKE ?)";
+    const k = `%${keyword}%`;
+    binds.push(k, k, k);
+  }
+  query += " ORDER BY status ASC, COALESCE(due_date, '9999-99-99') ASC, id DESC";
+
+  const stmt = env.DB.prepare(query).bind(...binds);
+  const { results } = await stmt.all();
+  return json({ followups: results.map(rowToFollowup) });
+}
+
+async function handleCreateFollowup(request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+  const site_name = typeof body.site_name === "string" ? body.site_name.trim() : "";
+  const content = typeof body.content === "string" ? body.content.trim() : "";
+  const due_date = typeof body.due_date === "string" && body.due_date ? body.due_date : null;
+  const remarks = typeof body.remarks === "string" ? body.remarks.trim() : "";
+  const status = toBool(body.status) ? 1 : 0;
+
+  if (!site_name) return badRequest("현장명을 선택해주세요.");
+  if (!content) return badRequest("내용을 입력해주세요.");
+
+  const result = await env.DB.prepare(
+    `INSERT INTO followups (site_name, content, due_date, status, remarks, created_at, updated_at, completed_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)`
+  )
+    .bind(site_name, content, due_date, status, remarks, status ? new Date().toISOString() : null)
+    .run();
+
+  return json({ ok: true, id: result.meta.last_row_id });
+}
+
+async function handleUpdateFollowup(id, request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+
+  const fields = [];
+  const binds = [];
+
+  if (typeof body.site_name === "string") {
+    fields.push("site_name = ?");
+    binds.push(body.site_name.trim());
+  }
+  if (typeof body.content === "string") {
+    fields.push("content = ?");
+    binds.push(body.content.trim());
+  }
+  if (body.due_date !== undefined) {
+    fields.push("due_date = ?");
+    binds.push(body.due_date || null);
+  }
+  if (typeof body.remarks === "string") {
+    fields.push("remarks = ?");
+    binds.push(body.remarks.trim());
+  }
+  if (body.status !== undefined) {
+    const statusVal = toBool(body.status) ? 1 : 0;
+    fields.push("status = ?");
+    binds.push(statusVal);
+    fields.push("completed_at = ?");
+    binds.push(statusVal ? "datetime('now')" : null);
+  }
+
+  if (fields.length === 0) return badRequest("수정할 내용이 없습니다.");
+
+  // completed_at 은 SQL 함수(datetime('now'))를 그대로 써야 하는 특수 케이스라 별도 처리합니다.
+  const setClauses = [];
+  const finalBinds = [];
+  for (let i = 0; i < fields.length; i++) {
+    if (fields[i] === "completed_at = ?" && binds[i] === "datetime('now')") {
+      setClauses.push("completed_at = datetime('now')");
+    } else {
+      setClauses.push(fields[i]);
+      finalBinds.push(binds[i]);
+    }
+  }
+  setClauses.push("updated_at = datetime('now')");
+  finalBinds.push(id);
+
+  await env.DB.prepare(`UPDATE followups SET ${setClauses.join(", ")} WHERE id = ?`)
+    .bind(...finalBinds)
+    .run();
+
+  return json({ ok: true });
+}
+
+async function handleDeleteFollowup(id, env) {
+  await env.DB.prepare("DELETE FROM followups WHERE id = ?").bind(id).run();
+  return json({ ok: true });
+}
+
 async function handleMonthlySummary(env) {
   // 월 + 현장별로 집계한 뒤, 프론트에서 월별 합계 / 현장별 상세로 다시 묶어서 보여줍니다.
   const { results } = await env.DB.prepare(
@@ -362,6 +616,37 @@ export default {
 
       if (path === "/api/monthly-summary" && method === "GET") {
         return await handleMonthlySummary(env);
+      }
+
+      if (path === "/api/journal" && method === "GET") {
+        return await handleGetJournal(request, env);
+      }
+      if (path === "/api/journal" && method === "POST") {
+        return await handleCreateJournal(request, env);
+      }
+      const journalMatch = path.match(/^\/api\/journal\/(\d+)$/);
+      if (journalMatch && method === "PUT") {
+        return await handleUpdateJournal(Number(journalMatch[1]), request, env);
+      }
+      if (journalMatch && method === "DELETE") {
+        return await handleDeleteJournal(Number(journalMatch[1]), env);
+      }
+      if (path === "/api/journal-summary" && method === "GET") {
+        return await handleJournalSummary(env);
+      }
+
+      if (path === "/api/followups" && method === "GET") {
+        return await handleGetFollowups(request, env);
+      }
+      if (path === "/api/followups" && method === "POST") {
+        return await handleCreateFollowup(request, env);
+      }
+      const followupMatch = path.match(/^\/api\/followups\/(\d+)$/);
+      if (followupMatch && method === "PUT") {
+        return await handleUpdateFollowup(Number(followupMatch[1]), request, env);
+      }
+      if (followupMatch && method === "DELETE") {
+        return await handleDeleteFollowup(Number(followupMatch[1]), env);
       }
 
       return json({ error: "Not Found" }, { status: 404 });

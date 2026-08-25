@@ -69,16 +69,86 @@
   const siteList = $("#siteList");
   const siteError = $("#siteError");
 
+  // ---------- 업무일지 화면 요소 ----------
+  const journalSection = $("#journalSection");
+  const journalFilterSite = $("#journalFilterSite");
+  const journalFilterMonth = $("#journalFilterMonth");
+  const journalFilterResetBtn = $("#journalFilterResetBtn");
+  const addJournalBtn = $("#addJournalBtn");
+  const journalAddForm = $("#journalAddForm");
+  const newJournalDate = $("#newJournalDate");
+  const newJournalSite = $("#newJournalSite");
+  const newJournalContent = $("#newJournalContent");
+  const newJournalRemarks = $("#newJournalRemarks");
+  const saveJournalBtn = $("#saveJournalBtn");
+  const cancelJournalBtn = $("#cancelJournalBtn");
+  const journalAddError = $("#journalAddError");
+  const journalBody = $("#journalBody");
+  const journalEmptyMsg = $("#journalEmptyMsg");
+  const journalWeekPicker = $("#journalWeekPicker");
+  const journalMonthPicker = $("#journalMonthPicker");
+  const downloadWeeklyBtn = $("#downloadWeeklyBtn");
+  const downloadMonthlyBtn = $("#downloadMonthlyBtn");
+  const exportError = $("#exportError");
+
+  // ---------- 후속 작업 화면 요소 ----------
+  const followupSection = $("#followupSection");
+  const followupFilterSite = $("#followupFilterSite");
+  const followupFilterStatus = $("#followupFilterStatus");
+  const followupFilterResetBtn = $("#followupFilterResetBtn");
+  const addFollowupBtn = $("#addFollowupBtn");
+  const followupAddForm = $("#followupAddForm");
+  const newFollowupSite = $("#newFollowupSite");
+  const newFollowupContent = $("#newFollowupContent");
+  const newFollowupDue = $("#newFollowupDue");
+  const newFollowupRemarks = $("#newFollowupRemarks");
+  const saveFollowupBtn = $("#saveFollowupBtn");
+  const cancelFollowupBtn = $("#cancelFollowupBtn");
+  const followupAddError = $("#followupAddError");
+  const followupBody = $("#followupBody");
+  const followupEmptyMsg = $("#followupEmptyMsg");
+
+  // ---------- 작업내역 조회 화면 요소 ----------
+  const overviewSection = $("#overviewSection");
+  const overviewModeMonthBtn = $("#overviewModeMonthBtn");
+  const overviewModeYearBtn = $("#overviewModeYearBtn");
+  const overviewPeriodHeader = $("#overviewPeriodHeader");
+  const overviewFilterSite = $("#overviewFilterSite");
+  const overviewSearchInput = $("#overviewSearchInput");
+  const overviewSearchBtn = $("#overviewSearchBtn");
+  const overviewSearchResetBtn = $("#overviewSearchResetBtn");
+  const overviewSearchHint = $("#overviewSearchHint");
+  const overviewTable = $("#overviewTable");
+  const overviewBody = $("#overviewBody");
+  const overviewSearchTable = $("#overviewSearchTable");
+  const overviewSearchBody = $("#overviewSearchBody");
+  const overviewEmptyMsg = $("#overviewEmptyMsg");
+
   let sites = [];
   let records = [];
   let editingId = null;
   let pollTimer = null;
-  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history"
+  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "followup" | "overview"
   let historyRows = [];
   let expandedMonths = new Set();
   let historyMode = "month"; // "month" | "year"
   let sortKey = null; // null | "site_name" | "work_date"
   let sortDir = "asc"; // "asc" | "desc"
+
+  // 업무일지 상태
+  let journalEntries = [];
+  let editingJournalId = null;
+
+  // 후속 작업 상태
+  let followupEntries = [];
+  let editingFollowupId = null;
+
+  // 작업내역 조회 상태
+  let overviewSummaryRows = [];
+  let overviewSearchResults = [];
+  let overviewMode = "month"; // "month" | "year"
+  let overviewExpandedPeriods = new Set();
+  let overviewSearching = false;
 
   const won = (n) => (Number(n) || 0).toLocaleString("ko-KR") + "원";
 
@@ -137,11 +207,26 @@
   function switchTab(tab) {
     activeTab = tab;
     tabBtns.forEach((btn) => btn.classList.toggle("tab-active", btn.dataset.tab === tab));
-    const isHistory = tab === "history";
-    listSection.classList.toggle("hidden", isHistory);
-    historyView.classList.toggle("hidden", !isHistory);
-    if (isHistory) {
+
+    const sectionsByTab = {
+      history: historyView,
+      journal: journalSection,
+      followup: followupSection,
+      overview: overviewSection,
+    };
+    listSection.classList.toggle("hidden", !CATEGORIES.includes(tab));
+    Object.entries(sectionsByTab).forEach(([key, el]) => {
+      el.classList.toggle("hidden", key !== tab);
+    });
+
+    if (tab === "history") {
       loadMonthlySummary();
+    } else if (tab === "journal") {
+      loadJournal();
+    } else if (tab === "followup") {
+      loadFollowups();
+    } else if (tab === "overview") {
+      loadOverview();
     } else {
       loadRecords();
     }
@@ -172,16 +257,23 @@
 
   // ---------- 폴링 (몇 초마다 자동 새로고침) ----------
 
+  function refreshActiveTab() {
+    if (activeTab === "history") {
+      loadMonthlySummary();
+    } else if (activeTab === "journal") {
+      if (editingJournalId === null) loadJournal();
+    } else if (activeTab === "followup") {
+      if (editingFollowupId === null) loadFollowups();
+    } else if (activeTab === "overview") {
+      loadOverview();
+    } else {
+      if (editingId === null) loadRecords();
+    }
+  }
+
   function startPolling() {
     stopPolling();
-    pollTimer = setInterval(() => {
-      if (editingId !== null) return; // 편집 중에는 화면을 덮어쓰지 않음
-      if (activeTab === "history") {
-        loadMonthlySummary();
-      } else {
-        loadRecords();
-      }
-    }, 5000);
+    pollTimer = setInterval(refreshActiveTab, 5000);
   }
   function stopPolling() {
     if (pollTimer) clearInterval(pollTimer);
@@ -189,8 +281,7 @@
   }
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && !appView.classList.contains("hidden")) {
-      if (activeTab === "history") loadMonthlySummary();
-      else loadRecords();
+      refreshActiveTab();
     }
   });
 
@@ -205,15 +296,25 @@
 
   function renderSiteSelects() {
     const opts = sites.map((s) => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join("");
-    const prevFilter = filterSite.value;
-    const prevNew = newSite.value;
-    const prevHistoryFilter = historyFilterSite.value;
-    filterSite.innerHTML = `<option value="">전체 현장</option>${opts}`;
-    newSite.innerHTML = `<option value="">현장 선택</option>${opts}`;
-    historyFilterSite.innerHTML = `<option value="">전체 현장</option>${opts}`;
-    if (sites.some((s) => s.name === prevFilter)) filterSite.value = prevFilter;
-    if (sites.some((s) => s.name === prevNew)) newSite.value = prevNew;
-    if (sites.some((s) => s.name === prevHistoryFilter)) historyFilterSite.value = prevHistoryFilter;
+    const filterOpts = `<option value="">전체 현장</option>${opts}`;
+    const pickOpts = `<option value="">현장 선택</option>${opts}`;
+
+    const targets = [
+      [filterSite, filterOpts],
+      [newSite, pickOpts],
+      [historyFilterSite, filterOpts],
+      [journalFilterSite, filterOpts],
+      [newJournalSite, pickOpts],
+      [followupFilterSite, filterOpts],
+      [newFollowupSite, pickOpts],
+      [overviewFilterSite, filterOpts],
+    ];
+
+    const prevValues = targets.map(([el]) => el.value);
+    targets.forEach(([el, html]) => { el.innerHTML = html; });
+    targets.forEach(([el], i) => {
+      if (sites.some((s) => s.name === prevValues[i])) el.value = prevValues[i];
+    });
   }
 
   function renderSiteModalList() {
@@ -688,6 +789,580 @@
     filterMonth.value = period;
     filterSite.value = historyFilterSite.value || "";
     switchTab(historyFilterCategory.value || "작업내역");
+  });
+
+  // ================= 업무일지 (현장명 / 작업내역 / 비고) =================
+
+  async function loadJournal() {
+    const params = new URLSearchParams();
+    if (journalFilterSite.value) params.set("site", journalFilterSite.value);
+    if (journalFilterMonth.value) params.set("month", journalFilterMonth.value);
+    const data = await api(`/api/journal?${params.toString()}`);
+    journalEntries = data.entries;
+    rebuildJournalMonthFilterOptions();
+    renderJournal();
+  }
+
+  function rebuildJournalMonthFilterOptions() {
+    const months = new Set(journalEntries.map((r) => (r.work_date || "").slice(0, 7)).filter(Boolean));
+    const prev = journalFilterMonth.value;
+    const sorted = Array.from(months).sort().reverse();
+    journalFilterMonth.innerHTML =
+      `<option value="">전체 기간</option>` + sorted.map((m) => `<option value="${m}">${m}</option>`).join("");
+    if (sorted.includes(prev)) journalFilterMonth.value = prev;
+  }
+
+  journalFilterSite.addEventListener("change", loadJournal);
+  journalFilterMonth.addEventListener("change", loadJournal);
+  journalFilterResetBtn.addEventListener("click", () => {
+    journalFilterSite.value = "";
+    journalFilterMonth.value = "";
+    loadJournal();
+  });
+
+  addJournalBtn.addEventListener("click", () => {
+    journalAddError.textContent = "";
+    journalAddForm.classList.toggle("hidden");
+    if (!journalAddForm.classList.contains("hidden") && !newJournalDate.value) {
+      newJournalDate.value = todayStr();
+    }
+  });
+  cancelJournalBtn.addEventListener("click", () => {
+    journalAddForm.classList.add("hidden");
+    resetJournalAddForm();
+  });
+
+  function resetJournalAddForm() {
+    newJournalDate.value = todayStr();
+    newJournalSite.value = "";
+    newJournalContent.value = "";
+    newJournalRemarks.value = "";
+    journalAddError.textContent = "";
+  }
+
+  saveJournalBtn.addEventListener("click", async () => {
+    journalAddError.textContent = "";
+    if (!newJournalSite.value) { journalAddError.textContent = "현장을 선택해주세요."; return; }
+    if (!newJournalDate.value) { journalAddError.textContent = "작업 날짜를 선택해주세요."; return; }
+    try {
+      await api("/api/journal", {
+        method: "POST",
+        body: JSON.stringify({
+          work_date: newJournalDate.value,
+          site_name: newJournalSite.value,
+          content: newJournalContent.value,
+          remarks: newJournalRemarks.value,
+        }),
+      });
+      journalAddForm.classList.add("hidden");
+      resetJournalAddForm();
+      await loadJournal();
+    } catch (err) {
+      journalAddError.textContent = err.message;
+    }
+  });
+
+  function renderJournal() {
+    if (journalEntries.length === 0) {
+      journalBody.innerHTML = "";
+      journalEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    journalEmptyMsg.classList.add("hidden");
+    journalBody.innerHTML = journalEntries
+      .map((r) => (editingJournalId === r.id ? journalEditRowHtml(r) : journalViewRowHtml(r)))
+      .join("");
+  }
+
+  function journalViewRowHtml(r) {
+    return `
+      <tr data-id="${r.id}">
+        <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+        <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
+        <td class="content-cell-wide" data-label="작업내역"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
+        <td class="content-cell-wide" data-label="비고"><span class="cell-value">${escapeHtml(r.remarks) || "-"}</span></td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-ghost btn-sm" data-action="edit-journal" data-id="${r.id}">수정</button>
+            <button class="btn btn-danger btn-sm" data-action="delete-journal" data-id="${r.id}">삭제</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  function journalEditRowHtml(r) {
+    const siteOpts = sites
+      .map((s) => `<option value="${escapeHtml(s.name)}" ${s.name === r.site_name ? "selected" : ""}>${escapeHtml(s.name)}</option>`)
+      .join("");
+    return `
+      <tr data-id="${r.id}">
+        <td class="col-date" data-label="작업일"><input class="edit-input" type="date" data-edit="work_date" value="${r.work_date || ""}" /></td>
+        <td data-label="현장명"><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
+        <td data-label="작업내역"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
+        <td data-label="비고"><input class="edit-input" data-edit="remarks" value="${escapeHtml(r.remarks)}" /></td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-primary btn-sm" data-action="save-edit-journal" data-id="${r.id}">저장</button>
+            <button class="btn btn-ghost btn-sm" data-action="cancel-edit-journal" data-id="${r.id}">취소</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  journalBody.addEventListener("click", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (!action || !id) return;
+
+    if (action === "edit-journal") {
+      editingJournalId = Number(id);
+      renderJournal();
+    } else if (action === "cancel-edit-journal") {
+      editingJournalId = null;
+      renderJournal();
+    } else if (action === "save-edit-journal") {
+      const row = e.target.closest("tr");
+      const patch = {
+        work_date: row.querySelector('[data-edit="work_date"]').value || null,
+        site_name: row.querySelector('[data-edit="site_name"]').value,
+        content: row.querySelector('[data-edit="content"]').value,
+        remarks: row.querySelector('[data-edit="remarks"]').value,
+      };
+      try {
+        await api(`/api/journal/${id}`, { method: "PUT", body: JSON.stringify(patch) });
+        editingJournalId = null;
+        await loadJournal();
+      } catch (err) {
+        alert(err.message);
+      }
+    } else if (action === "delete-journal") {
+      if (!confirm("이 업무일지를 삭제할까요?")) return;
+      try {
+        await api(`/api/journal/${id}`, { method: "DELETE" });
+        await loadJournal();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  // ---- 주간 / 월간 시설 작업일지 엑셀 다운로드 ----
+
+  function isoWeekToRange(weekStr) {
+    // weekStr: "YYYY-Www" (예: "2026-W35") -> 그 주의 월요일 ~ 일요일 날짜 범위 (ISO 8601 기준)
+    const m = /^(\d{4})-W(\d{2})$/.exec(weekStr || "");
+    if (!m) return null;
+    const year = Number(m[1]);
+    const week = Number(m[2]);
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const jan4Day = jan4.getUTCDay() || 7; // 월=1 ... 일=7
+    const week1Monday = new Date(jan4);
+    week1Monday.setUTCDate(jan4.getUTCDate() - (jan4Day - 1));
+    const monday = new Date(week1Monday);
+    monday.setUTCDate(week1Monday.getUTCDate() + (week - 1) * 7);
+    const sunday = new Date(monday);
+    sunday.setUTCDate(monday.getUTCDate() + 6);
+    const fmt = (d) => d.toISOString().slice(0, 10);
+    return { from: fmt(monday), to: fmt(sunday), label: `${fmt(monday)} ~ ${fmt(sunday)}` };
+  }
+
+  function buildJournalWorkbook(rows, title, filename) {
+    if (typeof XLSX === "undefined") {
+      throw new Error("엑셀 생성 라이브러리를 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.");
+    }
+    const aoa = [];
+    aoa.push([`비엠에스코리아 부산지사 ${title}`]);
+    aoa.push([]);
+    aoa.push(["번호", "작업일", "현장명", "작업내역", "비고"]);
+    rows.forEach((r, i) => {
+      aoa.push([i + 1, r.work_date || "", r.site_name || "", r.content || "", r.remarks || ""]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }];
+    ws["!cols"] = [{ wch: 6 }, { wch: 13 }, { wch: 20 }, { wch: 55 }, { wch: 30 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "작업일지");
+    XLSX.writeFile(wb, filename);
+  }
+
+  downloadWeeklyBtn.addEventListener("click", async () => {
+    exportError.textContent = "";
+    const range = isoWeekToRange(journalWeekPicker.value);
+    if (!range) { exportError.textContent = "다운로드할 주(week)를 선택해주세요."; return; }
+    try {
+      const params = new URLSearchParams({ from: range.from, to: range.to, sort: "asc" });
+      if (journalFilterSite.value) params.set("site", journalFilterSite.value);
+      const data = await api(`/api/journal?${params.toString()}`);
+      if (!data.entries || data.entries.length === 0) {
+        exportError.textContent = "선택한 주간에 등록된 업무일지가 없습니다.";
+        return;
+      }
+      buildJournalWorkbook(data.entries, `주간 시설 작업일지 (${range.label})`, `주간시설작업일지_${range.from}_${range.to}.xlsx`);
+    } catch (err) {
+      exportError.textContent = err.message;
+    }
+  });
+
+  downloadMonthlyBtn.addEventListener("click", async () => {
+    exportError.textContent = "";
+    const month = journalMonthPicker.value; // "YYYY-MM"
+    if (!month) { exportError.textContent = "다운로드할 월을 선택해주세요."; return; }
+    try {
+      const params = new URLSearchParams({ month, sort: "asc" });
+      if (journalFilterSite.value) params.set("site", journalFilterSite.value);
+      const data = await api(`/api/journal?${params.toString()}`);
+      if (!data.entries || data.entries.length === 0) {
+        exportError.textContent = "선택한 월에 등록된 업무일지가 없습니다.";
+        return;
+      }
+      buildJournalWorkbook(data.entries, `월간 시설 작업일지 (${month})`, `월간시설작업일지_${month}.xlsx`);
+    } catch (err) {
+      exportError.textContent = err.message;
+    }
+  });
+
+  // ================= 후속 작업 (앞으로 진행해야 하는 업무 등록/조회) =================
+
+  async function loadFollowups() {
+    const params = new URLSearchParams();
+    if (followupFilterSite.value) params.set("site", followupFilterSite.value);
+    if (followupFilterStatus.value !== "") params.set("status", followupFilterStatus.value);
+    const data = await api(`/api/followups?${params.toString()}`);
+    followupEntries = data.followups;
+    renderFollowups();
+  }
+
+  followupFilterSite.addEventListener("change", loadFollowups);
+  followupFilterStatus.addEventListener("change", loadFollowups);
+  followupFilterResetBtn.addEventListener("click", () => {
+    followupFilterSite.value = "";
+    followupFilterStatus.value = "";
+    loadFollowups();
+  });
+
+  addFollowupBtn.addEventListener("click", () => {
+    followupAddError.textContent = "";
+    followupAddForm.classList.toggle("hidden");
+  });
+  cancelFollowupBtn.addEventListener("click", () => {
+    followupAddForm.classList.add("hidden");
+    resetFollowupAddForm();
+  });
+
+  function resetFollowupAddForm() {
+    newFollowupSite.value = "";
+    newFollowupContent.value = "";
+    newFollowupDue.value = "";
+    newFollowupRemarks.value = "";
+    followupAddError.textContent = "";
+  }
+
+  saveFollowupBtn.addEventListener("click", async () => {
+    followupAddError.textContent = "";
+    if (!newFollowupSite.value) { followupAddError.textContent = "현장을 선택해주세요."; return; }
+    if (!newFollowupContent.value.trim()) { followupAddError.textContent = "내용을 입력해주세요."; return; }
+    try {
+      await api("/api/followups", {
+        method: "POST",
+        body: JSON.stringify({
+          site_name: newFollowupSite.value,
+          content: newFollowupContent.value,
+          due_date: newFollowupDue.value || null,
+          remarks: newFollowupRemarks.value,
+        }),
+      });
+      followupAddForm.classList.add("hidden");
+      resetFollowupAddForm();
+      await loadFollowups();
+    } catch (err) {
+      followupAddError.textContent = err.message;
+    }
+  });
+
+  function isOverdue(r) {
+    if (r.status || !r.due_date) return false;
+    return r.due_date < todayStr();
+  }
+
+  function renderFollowups() {
+    if (followupEntries.length === 0) {
+      followupBody.innerHTML = "";
+      followupEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    followupEmptyMsg.classList.add("hidden");
+    followupBody.innerHTML = followupEntries
+      .map((r) => (editingFollowupId === r.id ? followupEditRowHtml(r) : followupViewRowHtml(r)))
+      .join("");
+  }
+
+  function followupViewRowHtml(r) {
+    const rowClass = r.status ? "paid-row" : isOverdue(r) ? "overdue-row" : "";
+    return `
+      <tr class="${rowClass}" data-id="${r.id}">
+        <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
+        <td class="content-cell-wide" data-label="내용"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
+        <td class="col-date" data-label="예정일"><span class="cell-value">${escapeHtml(r.due_date) || "-"}</span></td>
+        <td class="content-cell-wide" data-label="비고"><span class="cell-value">${escapeHtml(r.remarks) || "-"}</span></td>
+        <td class="col-check" data-label="완료">
+          <input type="checkbox" data-action="toggle-followup-status" data-id="${r.id}" ${r.status ? "checked" : ""} />
+        </td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-ghost btn-sm" data-action="edit-followup" data-id="${r.id}">수정</button>
+            <button class="btn btn-danger btn-sm" data-action="delete-followup" data-id="${r.id}">삭제</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  function followupEditRowHtml(r) {
+    const siteOpts = sites
+      .map((s) => `<option value="${escapeHtml(s.name)}" ${s.name === r.site_name ? "selected" : ""}>${escapeHtml(s.name)}</option>`)
+      .join("");
+    return `
+      <tr data-id="${r.id}">
+        <td data-label="현장명"><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
+        <td data-label="내용"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
+        <td class="col-date" data-label="예정일"><input class="edit-input" type="date" data-edit="due_date" value="${r.due_date || ""}" /></td>
+        <td data-label="비고"><input class="edit-input" data-edit="remarks" value="${escapeHtml(r.remarks)}" /></td>
+        <td class="col-check" data-label="완료">
+          <input type="checkbox" data-edit="status" ${r.status ? "checked" : ""} />
+        </td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-primary btn-sm" data-action="save-edit-followup" data-id="${r.id}">저장</button>
+            <button class="btn btn-ghost btn-sm" data-action="cancel-edit-followup" data-id="${r.id}">취소</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  followupBody.addEventListener("change", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (!action || !id) return;
+    if (action === "toggle-followup-status") {
+      try {
+        await api(`/api/followups/${id}`, { method: "PUT", body: JSON.stringify({ status: e.target.checked }) });
+        await loadFollowups();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  followupBody.addEventListener("click", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (!action || !id) return;
+
+    if (action === "edit-followup") {
+      editingFollowupId = Number(id);
+      renderFollowups();
+    } else if (action === "cancel-edit-followup") {
+      editingFollowupId = null;
+      renderFollowups();
+    } else if (action === "save-edit-followup") {
+      const row = e.target.closest("tr");
+      const patch = {
+        site_name: row.querySelector('[data-edit="site_name"]').value,
+        content: row.querySelector('[data-edit="content"]').value,
+        due_date: row.querySelector('[data-edit="due_date"]').value || null,
+        remarks: row.querySelector('[data-edit="remarks"]').value,
+        status: row.querySelector('[data-edit="status"]').checked,
+      };
+      try {
+        await api(`/api/followups/${id}`, { method: "PUT", body: JSON.stringify(patch) });
+        editingFollowupId = null;
+        await loadFollowups();
+      } catch (err) {
+        alert(err.message);
+      }
+    } else if (action === "delete-followup") {
+      if (!confirm("이 후속 작업을 삭제할까요?")) return;
+      try {
+        await api(`/api/followups/${id}`, { method: "DELETE" });
+        await loadFollowups();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  // ================= 작업내역 조회 (월별/연간 통합 + 현장/키워드 검색) =================
+
+  async function loadOverview() {
+    if (overviewSearching) {
+      await runOverviewSearch();
+    } else {
+      await loadOverviewSummary();
+    }
+  }
+
+  async function loadOverviewSummary() {
+    const data = await api("/api/journal-summary");
+    overviewSummaryRows = data.rows || [];
+    renderOverviewSummary();
+  }
+
+  function switchOverviewMode(mode) {
+    overviewMode = mode;
+    overviewModeMonthBtn.classList.toggle("subtab-active", mode === "month");
+    overviewModeYearBtn.classList.toggle("subtab-active", mode === "year");
+    overviewPeriodHeader.textContent = mode === "month" ? "월" : "연도";
+    overviewExpandedPeriods.clear();
+    renderOverviewSummary();
+  }
+  overviewModeMonthBtn.addEventListener("click", () => switchOverviewMode("month"));
+  overviewModeYearBtn.addEventListener("click", () => switchOverviewMode("year"));
+  overviewFilterSite.addEventListener("change", () => {
+    if (overviewSearching) {
+      runOverviewSearch();
+    } else {
+      overviewExpandedPeriods.clear();
+      renderOverviewSummary();
+    }
+  });
+
+  function renderOverviewSummary() {
+    overviewSearchTable.classList.add("hidden");
+    overviewTable.classList.remove("hidden");
+
+    const siteFilter = overviewFilterSite.value;
+    const filteredRows = overviewSummaryRows.filter((r) => !siteFilter || r.site_name === siteFilter);
+
+    if (filteredRows.length === 0) {
+      overviewBody.innerHTML = "";
+      overviewEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    overviewEmptyMsg.classList.add("hidden");
+
+    const byPeriod = new Map();
+    for (const row of filteredRows) {
+      const m = row.month || "미상";
+      const key = overviewMode === "year" ? (m.slice(0, 4) || "미상") : m;
+      if (!byPeriod.has(key)) {
+        byPeriod.set(key, { period: key, count: 0, sitesMap: new Map() });
+      }
+      const bucket = byPeriod.get(key);
+      bucket.count += row.count;
+      const s = bucket.sitesMap.get(row.site_name) || { site_name: row.site_name, count: 0 };
+      s.count += row.count;
+      bucket.sitesMap.set(row.site_name, s);
+    }
+
+    const periods = Array.from(byPeriod.values()).sort((a, b) => (a.period < b.period ? 1 : -1));
+
+    overviewBody.innerHTML = periods
+      .map((m) => {
+        const isExpanded = overviewExpandedPeriods.has(m.period);
+        const siteRows = Array.from(m.sitesMap.values()).sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
+        const detailRows = isExpanded
+          ? siteRows
+              .map(
+                (s, i) => `
+              <tr class="site-detail-row ${i === siteRows.length - 1 ? "last-detail" : ""}" data-period="${m.period}" data-site="${escapeHtml(s.site_name)}">
+                <td class="site-detail-name" data-label="현장명"><span class="cell-value">${escapeHtml(s.site_name)}</span></td>
+                <td class="col-cost" data-label="작업 건수"><span class="cell-value">${s.count}건</span></td>
+                <td class="col-cost" data-label="참여 현장 수"><span class="cell-value">-</span></td>
+              </tr>`
+              )
+              .join("")
+          : "";
+        const periodLabel = overviewMode === "year" ? m.period + "년" : m.period;
+        return `
+          <tr class="month-row ${isExpanded ? "expanded" : ""}" data-period="${m.period}">
+            <td class="period-cell" data-label="${overviewMode === "year" ? "연도" : "월"}">
+              <span class="expand-icon">▶</span><span class="cell-value">${escapeHtml(periodLabel)}</span><span class="period-hint">${isExpanded ? "접기" : "현장별 보기"}</span>
+            </td>
+            <td class="col-cost" data-label="작업 건수"><span class="cell-value">${m.count}건</span></td>
+            <td class="col-cost" data-label="참여 현장 수"><span class="cell-value">${m.sitesMap.size}곳</span></td>
+          </tr>
+          ${detailRows}`;
+      })
+      .join("");
+  }
+
+  overviewBody.addEventListener("click", (e) => {
+    const detail = e.target.closest(".site-detail-row");
+    if (detail) {
+      if (overviewMode === "year") return;
+      journalFilterSite.value = detail.getAttribute("data-site") || "";
+      journalFilterMonth.value = detail.getAttribute("data-period") || "";
+      switchTab("journal");
+      return;
+    }
+    const row = e.target.closest(".month-row");
+    if (!row) return;
+    const period = row.getAttribute("data-period");
+    if (overviewExpandedPeriods.has(period)) overviewExpandedPeriods.delete(period);
+    else overviewExpandedPeriods.add(period);
+    renderOverviewSummary();
+  });
+
+  async function runOverviewSearch() {
+    const keyword = overviewSearchInput.value.trim();
+    const params = new URLSearchParams({ sort: "desc" });
+    if (keyword) params.set("keyword", keyword);
+    if (overviewFilterSite.value) params.set("site", overviewFilterSite.value);
+    const data = await api(`/api/journal?${params.toString()}`);
+    overviewSearchResults = data.entries || [];
+    renderOverviewSearch(keyword);
+  }
+
+  function highlightKeyword(text, keyword) {
+    const escaped = escapeHtml(text);
+    if (!keyword) return escaped || "-";
+    const escapedKeyword = escapeHtml(keyword).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return (escaped || "-").replace(new RegExp(escapedKeyword, "gi"), (m) => `<mark>${m}</mark>`);
+  }
+
+  function renderOverviewSearch(keyword) {
+    overviewTable.classList.add("hidden");
+    overviewSearchTable.classList.remove("hidden");
+
+    overviewSearchHint.classList.remove("hidden");
+    overviewSearchHint.textContent = keyword
+      ? `"${keyword}" 검색 결과 ${overviewSearchResults.length}건`
+      : `전체 업무일지 ${overviewSearchResults.length}건`;
+
+    if (overviewSearchResults.length === 0) {
+      overviewSearchBody.innerHTML = "";
+      overviewEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    overviewEmptyMsg.classList.add("hidden");
+
+    overviewSearchBody.innerHTML = overviewSearchResults
+      .map(
+        (r) => `
+        <tr>
+          <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+          <td class="site-badge" data-label="현장명"><span class="cell-value">${highlightKeyword(r.site_name, keyword)}</span></td>
+          <td class="content-cell-wide" data-label="작업내역"><span class="cell-value">${highlightKeyword(r.content, keyword)}</span></td>
+          <td class="content-cell-wide" data-label="비고"><span class="cell-value">${highlightKeyword(r.remarks, keyword)}</span></td>
+        </tr>`
+      )
+      .join("");
+  }
+
+  overviewSearchBtn.addEventListener("click", async () => {
+    overviewSearching = true;
+    await runOverviewSearch();
+  });
+  overviewSearchInput.addEventListener("keydown", async (e) => {
+    if (e.key === "Enter") {
+      overviewSearching = true;
+      await runOverviewSearch();
+    }
+  });
+  overviewSearchResetBtn.addEventListener("click", async () => {
+    overviewSearching = false;
+    overviewSearchInput.value = "";
+    overviewSearchHint.classList.add("hidden");
+    await loadOverviewSummary();
   });
 
   function escapeHtml(str) {

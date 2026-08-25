@@ -257,6 +257,28 @@ input:focus, select:focus {
 }
 .add-form-actions { margin-top: 14px; display: flex; gap: 8px; }
 
+/* ---------- 업무일지: 주간/월간 시설 작업일지 엑셀 다운로드 ---------- */
+.export-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+}
+.export-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.export-label { font-size: 13.5px; font-weight: 700; color: var(--navy); white-space: nowrap; }
+.export-bar .error-msg { width: 100%; margin: 4px 0 0; }
+
+/* ---------- 작업내역 조회: 검색 ---------- */
+.search-filters { flex: 1 1 auto; }
+.search-filters input[type="text"] { flex: 1 1 240px; min-width: 200px; }
+.search-hint { font-size: 13px; color: var(--text-muted); margin: -6px 0 12px; }
+
 /* ---------- 표 ---------- */
 .table-wrap {
   background: var(--surface);
@@ -268,6 +290,10 @@ input:focus, select:focus {
 table { width: 100%; border-collapse: collapse; }
 #recordsTable { min-width: 780px; }
 #historyTable { min-width: 660px; }
+#journalTable { min-width: 700px; }
+#followupTable { min-width: 760px; }
+#overviewTable { min-width: 500px; }
+#overviewSearchTable { min-width: 700px; }
 
 thead th {
   text-align: left;
@@ -296,6 +322,10 @@ tbody tr:last-child td { border-bottom: none; }
 tbody tr.paid-row { background: var(--paid-row-bg); }
 tbody tr.paid-row td { border-bottom: 1px solid var(--paid-row-border); }
 
+/* 후속 작업: 예정일이 지났는데 아직 완료되지 않은 항목을 눈에 띄게 표시 */
+tbody tr.overdue-row { background: #fdf3ea; }
+tbody tr.overdue-row td { border-bottom: 1px solid #f3ddc2; }
+
 .col-cost { text-align: right; }
 /* 금액은 줄바꿈되면 행 높이가 들쭉날쭉해지므로 한 줄로 고정합니다. */
 td.col-cost { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -308,7 +338,12 @@ td.col-date { white-space: nowrap; }
 
 .content-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* 업무일지/후속작업의 작업내역·비고 칸은 내용이 길 수 있으므로 줄바꿈으로 전체 표시합니다. */
+.content-cell-wide { max-width: 420px; white-space: normal; word-break: break-word; }
+
 .col-site { min-width: 170px; }
+.col-remarks { min-width: 160px; }
+mark { background: #fff3a3; color: inherit; border-radius: 3px; padding: 0 2px; }
 
 /* 현장명 칸.
    예전에는 display:inline-block 이 걸려 있어서 이 칸만 표의 셀에서 빠져나와
@@ -328,24 +363,24 @@ td.site-badge {
 
 .empty-msg { text-align: center; color: var(--text-muted); padding: 30px 0; }
 
-/* ---------- 히스토리 ---------- */
-#historyTable .month-row { cursor: pointer; }
-#historyTable .month-row:hover { background: var(--surface-soft); }
-#historyTable .month-row td { font-weight: 700; }
-#historyTable .period-cell { color: var(--navy); font-size: 15px; }
-#historyTable .expand-icon {
+/* ---------- 히스토리 / 작업내역 조회 (월별·연간 집계 표는 같은 구조를 공유합니다) ---------- */
+#historyTable .month-row, #overviewTable .month-row { cursor: pointer; }
+#historyTable .month-row:hover, #overviewTable .month-row:hover { background: var(--surface-soft); }
+#historyTable .month-row td, #overviewTable .month-row td { font-weight: 700; }
+#historyTable .period-cell, #overviewTable .period-cell { color: var(--navy); font-size: 15px; }
+#historyTable .expand-icon, #overviewTable .expand-icon {
   display: inline-block;
   width: 15px;
   font-size: 11px;
   transition: transform 0.15s ease;
   color: var(--text-muted);
 }
-#historyTable .month-row.expanded .expand-icon { transform: rotate(90deg); }
+#historyTable .month-row.expanded .expand-icon, #overviewTable .month-row.expanded .expand-icon { transform: rotate(90deg); }
 /* "현장별 보기 / 접기" 안내는 좁은 화면에서만 보여줍니다. */
-#historyTable .period-hint { display: none; }
-#historyTable .site-detail-row { cursor: pointer; }
-#historyTable .site-detail-row:hover td { background: #eef2f8; }
-#historyTable .site-detail-row td {
+#historyTable .period-hint, #overviewTable .period-hint { display: none; }
+#historyTable .site-detail-row, #overviewTable .site-detail-row { cursor: pointer; }
+#historyTable .site-detail-row:hover td, #overviewTable .site-detail-row:hover td { background: #eef2f8; }
+#historyTable .site-detail-row td, #overviewTable .site-detail-row td {
   background: var(--surface-soft);
   font-size: 13px;
   color: var(--text-muted);
@@ -353,13 +388,13 @@ td.site-badge {
   padding-top: 8px;
   padding-bottom: 8px;
 }
-#historyTable .site-detail-row .site-detail-name {
+#historyTable .site-detail-row .site-detail-name, #overviewTable .site-detail-row .site-detail-name {
   color: var(--text);
   font-weight: 600;
   padding-left: 30px;
 }
-#historyTable .deficit { color: var(--danger); font-weight: 700; }
-#historyTable .deficit-zero { color: var(--good-text); font-weight: 700; }
+#historyTable .deficit, #overviewTable .deficit { color: var(--danger); font-weight: 700; }
+#historyTable .deficit-zero, #overviewTable .deficit-zero { color: var(--good-text); font-weight: 700; }
 
 /* ---------- 모달 ---------- */
 .modal-overlay {
@@ -405,21 +440,28 @@ td.site-badge {
   .card-value { font-size: 24px; }
   .tab-btn { flex: 0 0 auto; padding: 10px 14px; }
 
-  /* ---------- 내역 목록: 표 -> 세로 카드 ---------- */
-  #listSection .table-wrap {
+  /* ---------- 내역 목록 / 업무일지 / 후속작업 / 조회 검색결과: 표 -> 세로 카드 ----------
+     같은 카드형 레이아웃을 여러 표(#recordsTable, #journalTable, #followupTable,
+     #overviewSearchTable)가 함께 사용합니다. */
+  #listSection .table-wrap,
+  #journalSection .table-wrap,
+  #followupSection .table-wrap {
     overflow-x: visible;
     border: none;
     background: transparent;
     border-radius: 0;
     box-shadow: none;
   }
-  #recordsTable { min-width: 0; width: 100%; }
-  #recordsTable thead { display: none; }
-  #recordsTable, #recordsTable tbody, #recordsTable tr, #recordsTable td {
+  #recordsTable, #journalTable, #followupTable, #overviewSearchTable { min-width: 0; width: 100%; }
+  #recordsTable thead, #journalTable thead, #followupTable thead, #overviewSearchTable thead { display: none; }
+  #recordsTable, #recordsTable tbody, #recordsTable tr, #recordsTable td,
+  #journalTable, #journalTable tbody, #journalTable tr, #journalTable td,
+  #followupTable, #followupTable tbody, #followupTable tr, #followupTable td,
+  #overviewSearchTable, #overviewSearchTable tbody, #overviewSearchTable tr, #overviewSearchTable td {
     display: block;
     width: 100%;
   }
-  #recordsTable tbody tr {
+  #recordsTable tbody tr, #journalTable tbody tr, #followupTable tbody tr, #overviewSearchTable tbody tr {
     /* 위쪽의 일괄 width:100% 규칙 + 아래 margin 이 합쳐지면 카드가 좌우로
        margin 만큼 컨테이너 밖으로 삐져나가므로 width 를 auto 로 되돌립니다. */
     width: auto;
@@ -431,8 +473,9 @@ td.site-badge {
     overflow: hidden;
     box-shadow: var(--shadow);
   }
-  #recordsTable tbody tr.paid-row { border-color: var(--paid-row-border); }
-  #recordsTable tbody td {
+  #recordsTable tbody tr.paid-row, #followupTable tbody tr.paid-row { border-color: var(--paid-row-border); }
+  #followupTable tbody tr.overdue-row { border-color: #f3ddc2; }
+  #recordsTable tbody td, #journalTable tbody td, #followupTable tbody td, #overviewSearchTable tbody td {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -441,8 +484,11 @@ td.site-badge {
     border-bottom: 1px dashed var(--border);
     white-space: normal;
   }
-  #recordsTable tbody tr td:last-child { border-bottom: none; }
-  #recordsTable tbody td::before {
+  #recordsTable tbody tr td:last-child,
+  #journalTable tbody tr td:last-child,
+  #followupTable tbody tr td:last-child,
+  #overviewSearchTable tbody tr td:last-child { border-bottom: none; }
+  #recordsTable tbody td::before, #journalTable tbody td::before, #followupTable tbody td::before, #overviewSearchTable tbody td::before {
     content: attr(data-label);
     font-size: 12px;
     font-weight: 700;
@@ -452,44 +498,56 @@ td.site-badge {
   }
   /* 값 부분(.cell-value)은 라벨과 함께 flex 항목으로 배치하고,
      min-width:0 을 줘서 카드 밖으로 넘치지 않게 합니다. */
-  #recordsTable tbody td > .cell-value {
+  #recordsTable tbody td > .cell-value,
+  #journalTable tbody td > .cell-value,
+  #followupTable tbody td > .cell-value,
+  #overviewSearchTable tbody td > .cell-value {
     flex: 1 1 auto;
     min-width: 0;
     text-align: right;
     overflow-wrap: break-word;
     word-break: keep-all;
   }
-  #recordsTable td.site-badge { font-size: 16px; color: var(--navy); }
-  #recordsTable td.content-cell {
+  #recordsTable td.site-badge, #journalTable td.site-badge, #followupTable td.site-badge, #overviewSearchTable td.site-badge {
+    font-size: 16px;
+    color: var(--navy);
+  }
+  #recordsTable td.content-cell,
+  #journalTable td.content-cell-wide,
+  #followupTable td.content-cell-wide,
+  #overviewSearchTable td.content-cell-wide {
     max-width: none;
     overflow: visible;
     text-overflow: initial;
     white-space: normal;
   }
-  #recordsTable td.col-manage::before { content: none; }
-  #recordsTable td.col-manage { justify-content: flex-end; }
-  #recordsTable .edit-input { width: auto; max-width: 200px; margin-left: auto; }
-  #recordsTable select.edit-input { min-width: 0; }
+  #recordsTable td.col-manage::before, #journalTable td.col-manage::before, #followupTable td.col-manage::before {
+    content: none;
+  }
+  #recordsTable td.col-manage, #journalTable td.col-manage, #followupTable td.col-manage { justify-content: flex-end; }
+  #recordsTable .edit-input, #journalTable .edit-input, #followupTable .edit-input { width: auto; max-width: 200px; margin-left: auto; }
+  #recordsTable select.edit-input, #journalTable select.edit-input, #followupTable select.edit-input { min-width: 0; }
 
-  /* ---------- 히스토리: 표 -> 세로 카드 ----------
+  /* ---------- 히스토리 / 작업내역 조회: 표 -> 세로 카드 ----------
      가로로 드래그해서 봐야 했던 월/현장별 집계를, 항목을 아래로 쌓아
-     세로 스크롤만으로 볼 수 있게 바꿉니다. */
-  #historyView .table-wrap {
+     세로 스크롤만으로 볼 수 있게 바꿉니다. #historyTable, #overviewTable 공통. */
+  #historyView .table-wrap, #overviewSection .table-wrap {
     overflow-x: visible;
     border: none;
     background: transparent;
     border-radius: 0;
     box-shadow: none;
   }
-  #historyTable { min-width: 0; width: 100%; }
-  #historyTable thead { display: none; }
-  #historyTable, #historyTable tbody, #historyTable tr, #historyTable td {
+  #historyTable, #overviewTable { min-width: 0; width: 100%; }
+  #historyTable thead, #overviewTable thead { display: none; }
+  #historyTable, #historyTable tbody, #historyTable tr, #historyTable td,
+  #overviewTable, #overviewTable tbody, #overviewTable tr, #overviewTable td {
     display: block;
     width: 100%;
   }
 
   /* 월(연도) 카드 */
-  #historyTable tbody tr.month-row {
+  #historyTable tbody tr.month-row, #overviewTable tbody tr.month-row {
     width: auto;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -500,9 +558,9 @@ td.site-badge {
     box-shadow: var(--shadow);
   }
   /* 상세가 펼쳐진 달은 아래 현장 카드들과 한 덩어리로 보이도록 붙입니다. */
-  #historyTable tbody tr.month-row.expanded { margin-bottom: 0; }
+  #historyTable tbody tr.month-row.expanded, #overviewTable tbody tr.month-row.expanded { margin-bottom: 0; }
 
-  #historyTable tbody tr.month-row td {
+  #historyTable tbody tr.month-row td, #overviewTable tbody tr.month-row td {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -512,21 +570,21 @@ td.site-badge {
     font-weight: 600;
     white-space: normal;
   }
-  #historyTable tbody tr.month-row td:last-child { border-bottom: none; }
-  #historyTable tbody tr.month-row td::before {
+  #historyTable tbody tr.month-row td:last-child, #overviewTable tbody tr.month-row td:last-child { border-bottom: none; }
+  #historyTable tbody tr.month-row td::before, #overviewTable tbody tr.month-row td::before {
     content: attr(data-label);
     font-size: 12px;
     font-weight: 700;
     color: var(--text-muted);
     flex: 0 0 auto;
   }
-  #historyTable tbody tr.month-row td > .cell-value {
+  #historyTable tbody tr.month-row td > .cell-value, #overviewTable tbody tr.month-row td > .cell-value {
     flex: 1 1 auto;
     min-width: 0;
     text-align: right;
   }
   /* 카드 머리글(월/연도) — 누르면 현장별 상세가 펼쳐집니다. */
-  #historyTable tbody tr.month-row td.period-cell {
+  #historyTable tbody tr.month-row td.period-cell, #overviewTable tbody tr.month-row td.period-cell {
     background: var(--navy-soft-bg);
     border-bottom: 1px solid var(--border);
     padding: 12px 16px;
@@ -536,12 +594,12 @@ td.site-badge {
     justify-content: flex-start;
     gap: 8px;
   }
-  #historyTable tbody tr.month-row td.period-cell::before { content: none; }
-  #historyTable tbody tr.month-row td.period-cell > .cell-value {
+  #historyTable tbody tr.month-row td.period-cell::before, #overviewTable tbody tr.month-row td.period-cell::before { content: none; }
+  #historyTable tbody tr.month-row td.period-cell > .cell-value, #overviewTable tbody tr.month-row td.period-cell > .cell-value {
     text-align: left;
     flex: 1 1 auto;
   }
-  #historyTable .period-hint {
+  #historyTable .period-hint, #overviewTable .period-hint {
     display: inline;
     font-size: 11.5px;
     font-weight: 600;
@@ -550,7 +608,7 @@ td.site-badge {
   }
 
   /* 현장별 상세 카드 */
-  #historyTable tbody tr.site-detail-row {
+  #historyTable tbody tr.site-detail-row, #overviewTable tbody tr.site-detail-row {
     width: auto;
     background: var(--surface-soft);
     border: 1px solid var(--border);
@@ -559,12 +617,12 @@ td.site-badge {
     padding: 4px 0;
     overflow: hidden;
   }
-  #historyTable tbody tr.site-detail-row.last-detail {
+  #historyTable tbody tr.site-detail-row.last-detail, #overviewTable tbody tr.site-detail-row.last-detail {
     border-bottom-left-radius: var(--radius);
     border-bottom-right-radius: var(--radius);
     margin-bottom: 10px;
   }
-  #historyTable tbody tr.site-detail-row td {
+  #historyTable tbody tr.site-detail-row td, #overviewTable tbody tr.site-detail-row td {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -575,21 +633,21 @@ td.site-badge {
     font-size: 13.5px;
     white-space: normal;
   }
-  #historyTable tbody tr.site-detail-row td::before {
+  #historyTable tbody tr.site-detail-row td::before, #overviewTable tbody tr.site-detail-row td::before {
     content: attr(data-label);
     font-size: 12px;
     font-weight: 700;
     color: var(--text-muted);
     flex: 0 0 auto;
   }
-  #historyTable tbody tr.site-detail-row td > .cell-value {
+  #historyTable tbody tr.site-detail-row td > .cell-value, #overviewTable tbody tr.site-detail-row td > .cell-value {
     flex: 1 1 auto;
     min-width: 0;
     text-align: right;
     overflow-wrap: break-word;
     word-break: keep-all;
   }
-  #historyTable tbody tr.site-detail-row td.site-detail-name {
+  #historyTable tbody tr.site-detail-row td.site-detail-name, #overviewTable tbody tr.site-detail-row td.site-detail-name {
     padding-left: 16px;
     padding-top: 10px;
     white-space: normal;
@@ -597,6 +655,12 @@ td.site-badge {
     font-weight: 700;
     color: var(--navy);
   }
-  #historyTable tbody tr.site-detail-row td.site-detail-name::before { content: none; }
-  #historyTable tbody tr.site-detail-row td.site-detail-name > .cell-value { text-align: left; }
+  #historyTable tbody tr.site-detail-row td.site-detail-name::before, #overviewTable tbody tr.site-detail-row td.site-detail-name::before { content: none; }
+  #historyTable tbody tr.site-detail-row td.site-detail-name > .cell-value, #overviewTable tbody tr.site-detail-row td.site-detail-name > .cell-value { text-align: left; }
+
+  /* ---------- 업무일지 다운로드 바 / 조회 검색창: 모바일에서 세로로 쌓기 ---------- */
+  .export-bar { flex-direction: column; align-items: stretch; }
+  .export-group { justify-content: space-between; }
+  .search-filters { flex-direction: column; align-items: stretch; }
+  .search-filters input[type="text"] { width: 100%; }
 }
