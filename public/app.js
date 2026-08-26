@@ -1407,12 +1407,12 @@
       });
       ws.getCell(r, 4).value = combo.content;
       xlsStyleCell(ws.getCell(r, 4), {
-        size: 11, fill: ds.fill, align: "left", valign: "top", wrap: true,
+        size: 11, fill: ds.fill, align: "left", wrap: true,
         border: { top: XLS_THIN, bottom: XLS_THIN, left: XLS_THIN, right: XLS_THIN },
       });
       ws.getCell(r, 5).value = combo.remarks;
       xlsStyleCell(ws.getCell(r, 5), {
-        size: 11, fill: ds.fill, align: "left", valign: "top", wrap: true,
+        size: 11, fill: ds.fill, align: "left", wrap: true,
         border: { top: XLS_THIN, bottom: XLS_THIN, left: XLS_THIN, right: XLS_MED },
       });
       ws.getRow(r).height = 72;
