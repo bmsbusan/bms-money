@@ -38,12 +38,12 @@
       <button class="tab-btn tab-active" data-tab="작업내역">작업 내역</button>
       <button class="tab-btn" data-tab="소독">소독</button>
       <button class="tab-btn" data-tab="저수조청소">저수조 청소</button>
-      <button class="tab-btn" data-tab="history">히스토리</button>
+      <button class="tab-btn" data-tab="history">작업 히스토리</button>
       <button class="tab-btn" data-tab="journal">시설 업무일지</button>
+      <button class="tab-btn" data-tab="overview">작업 내역 및 시설 업무일지 조회</button>
       <button class="tab-btn" data-tab="accounting">경리 업무일지</button>
       <button class="tab-btn" data-tab="accountingOverview">경리 업무일지 조회</button>
       <button class="tab-btn" data-tab="followup">후속 작업</button>
-      <button class="tab-btn" data-tab="overview">작업 내역 및 시설 업무일지 조회</button>
     </nav>
 
     <div id="listSection">
@@ -425,8 +425,8 @@
       <section class="toolbar">
         <div class="filters search-filters">
           <select id="overviewFilterType">
-            <option value="all">전체 (청구 작업내역 + 시설 업무일지)</option>
-            <option value="record">청구 작업내역만</option>
+            <option value="all">전체 (청구 내역 + 시설 업무일지)</option>
+            <option value="record">청구 내역만 (작업내역·소독·저수조 청소)</option>
             <option value="journal">시설 업무일지만</option>
           </select>
           <input id="overviewSearchInput" type="text" placeholder="현장명 또는 작업내용/비고 검색" />
@@ -441,7 +441,7 @@
           <thead>
             <tr>
               <th class="col-site" id="overviewPeriodHeader">월</th>
-              <th class="col-cost">청구 작업내역 건수</th>
+              <th class="col-cost">청구 내역 건수</th>
               <th class="col-cost">시설 업무일지 건수</th>
               <th class="col-cost">합계 건수</th>
               <th class="col-cost">참여 현장 수</th>

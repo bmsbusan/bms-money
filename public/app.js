@@ -1833,7 +1833,8 @@
   });
 
   // 현재 화면에 표시된(필터가 적용된) 경리 업무일지 목록을 그대로
-  // "번호. 현장명 / 줄바꿈 / 업무내용" 형태의 텍스트 파일로 내보냅니다.
+  // 맨 위 "[yyyymmdd 일일업무일지]" 제목 줄 + "번호. 현장명 / 줄바꿈 / 업무내용" 형태의
+  // 텍스트 파일로 내보냅니다.
   function downloadTextBlob(text, filename) {
     // Windows 메모장 등에서 한글이 깨지지 않도록 UTF-8 BOM을 붙입니다.
     const blob = new Blob(["﻿" + text], { type: "text/plain;charset=utf-8" });
@@ -1853,10 +1854,12 @@
       accountingExportError.textContent = "다운로드할 목록이 없습니다.";
       return;
     }
-    const text = accountingEntries
+    const dateLabel = accountingFilterDate.value || todayStr();
+    const dateCompact = dateLabel.replace(/-/g, "");
+    const body = accountingEntries
       .map((r, i) => `${i + 1}. ${r.site_name}\n${r.content || "-"}`)
       .join("\n\n");
-    const dateLabel = accountingFilterDate.value || todayStr();
+    const text = `[${dateCompact} 일일업무일지]\n\n${body}`;
     downloadTextBlob(text, `경리업무일지_${dateLabel}.txt`);
   });
 
@@ -2259,10 +2262,8 @@
   });
 
   // ================= 작업 내역 및 시설 업무일지 조회 (월별/연간 통합 + 검색) =================
-  // "청구 작업내역"(records 표, category=작업내역)과 "시설 업무일지"(journal_entries 표)를
-  // 한 화면에서 같이 집계/검색할 수 있게 합니다.
-
-  const OVERVIEW_RECORD_CATEGORY = "작업내역";
+  // "청구 내역"(records 표, category=작업내역/소독/저수조청소 전부 포함)과 "시설 업무일지"
+  // (journal_entries 표)를 한 화면에서 같이 집계/검색할 수 있게 합니다.
 
   async function loadOverview() {
     if (overviewSearching) {
@@ -2280,9 +2281,10 @@
     const journalRows = (journalData.rows || []).map((r) => ({
       month: r.month, site_name: r.site_name, count: r.count, source: "journal",
     }));
-    const recordRows = (recordData.rows || [])
-      .filter((r) => r.category === OVERVIEW_RECORD_CATEGORY)
-      .map((r) => ({ month: r.month, site_name: r.site_name, count: r.count, source: "record" }));
+    // category를 따로 필터링하지 않고 작업내역/소독/저수조청소를 모두 "청구 내역"으로 합산합니다.
+    const recordRows = (recordData.rows || []).map((r) => ({
+      month: r.month, site_name: r.site_name, count: r.count, source: "record", category: r.category,
+    }));
     overviewSummaryRows = [...journalRows, ...recordRows];
     renderOverviewSummary();
   }
@@ -2367,7 +2369,7 @@
                 return `
               <tr class="site-detail-row ${i === siteRows.length - 1 ? "last-detail" : ""}" data-period="${m.period}" data-site="${escapeHtml(s.site_name)}">
                 <td class="site-detail-name" data-label="현장명"><span class="cell-value">${escapeHtml(s.site_name)}</span></td>
-                <td class="col-cost" data-label="청구 작업내역 건수"><span class="cell-value">${s.recordCount}건</span></td>
+                <td class="col-cost" data-label="청구 내역 건수"><span class="cell-value">${s.recordCount}건</span></td>
                 <td class="col-cost" data-label="시설 업무일지 건수"><span class="cell-value">${s.journalCount}건</span></td>
                 <td class="col-cost" data-label="합계 건수"><span class="cell-value">${siteTotal}건</span></td>
                 <td class="col-cost" data-label="참여 현장 수"><span class="cell-value">-</span></td>
@@ -2381,7 +2383,7 @@
             <td class="period-cell" data-label="${overviewMode === "year" ? "연도" : "월"}">
               <span class="expand-icon">▶</span><span class="cell-value">${escapeHtml(periodLabel)}</span><span class="period-hint">${isExpanded ? "접기" : "현장별 보기"}</span>
             </td>
-            <td class="col-cost" data-label="청구 작업내역 건수"><span class="cell-value">${m.recordCount}건</span></td>
+            <td class="col-cost" data-label="청구 내역 건수"><span class="cell-value">${m.recordCount}건</span></td>
             <td class="col-cost" data-label="시설 업무일지 건수"><span class="cell-value">${m.journalCount}건</span></td>
             <td class="col-cost" data-label="합계 건수"><span class="cell-value">${total}건</span></td>
             <td class="col-cost" data-label="참여 현장 수"><span class="cell-value">${m.sitesMap.size}곳</span></td>
@@ -2440,7 +2442,8 @@
       );
     }
     if (typeFilter !== "journal") {
-      const params = new URLSearchParams({ category: OVERVIEW_RECORD_CATEGORY });
+      // category 파라미터를 지정하지 않으면 작업내역/소독/저수조청소가 모두 함께 조회됩니다.
+      const params = new URLSearchParams();
       if (keyword) params.set("keyword", keyword);
       if (site) params.set("site", site);
       if (month) params.set("month", month);
@@ -2450,6 +2453,7 @@
             work_date: r.work_date,
             site_name: r.site_name,
             source: "record",
+            category: r.category,
             content: r.content,
             note: `${won(r.cost)} · 청구${r.billed ? "완료" : "대기"} · 입금${r.paid ? "완료" : "대기"}`,
           }))
@@ -2483,10 +2487,12 @@
     return (escaped || "-").replace(new RegExp(escapedKeyword, "gi"), (m) => `<mark>${m}</mark>`);
   }
 
-  function sourceBadgeHtml(source) {
-    return source === "record"
-      ? `<span class="source-badge source-record">청구 작업내역</span>`
-      : `<span class="source-badge source-journal">시설 업무일지</span>`;
+  function sourceBadgeHtml(source, category) {
+    if (source !== "record") {
+      return `<span class="source-badge source-journal">시설 업무일지</span>`;
+    }
+    const label = category === "소독" ? "소독" : category === "저수조청소" ? "저수조 청소" : "청구 작업내역";
+    return `<span class="source-badge source-record">${label}</span>`;
   }
 
   function renderOverviewSearch(keyword, month) {
@@ -2514,7 +2520,7 @@
         (r) => `
         <tr>
           <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
-          <td data-label="구분"><span class="cell-value">${sourceBadgeHtml(r.source)}</span></td>
+          <td data-label="구분"><span class="cell-value">${sourceBadgeHtml(r.source, r.category)}</span></td>
           <td class="site-badge" data-label="현장명"><span class="cell-value">${highlightKeyword(r.site_name, keyword)}</span></td>
           <td class="content-cell-wide" data-label="작업내용"><span class="cell-value">${highlightKeyword(r.content, keyword)}</span></td>
           <td class="content-cell-wide" data-label="비고"><span class="cell-value">${r.source === "journal" ? highlightKeyword(r.note, keyword) : escapeHtml(r.note)}</span></td>
