@@ -41,6 +41,7 @@
       <button class="tab-btn" data-tab="history">히스토리</button>
       <button class="tab-btn" data-tab="journal">시설 업무일지</button>
       <button class="tab-btn" data-tab="accounting">경리 업무일지</button>
+      <button class="tab-btn" data-tab="accountingOverview">경리 업무일지 조회</button>
       <button class="tab-btn" data-tab="followup">후속 작업</button>
       <button class="tab-btn" data-tab="overview">작업 내역 및 시설 업무일지 조회</button>
     </nav>
@@ -300,6 +301,58 @@
       </section>
     </div>
 
+    <!-- 경리 업무일지 조회 화면 (월별/연간 통합 + 검색) -->
+    <div id="accountingOverviewSection" class="hidden">
+      <nav class="subtab-bar">
+        <button id="acctOverviewModeMonthBtn" class="subtab-btn subtab-active" data-mode="month">월별</button>
+        <button id="acctOverviewModeYearBtn" class="subtab-btn" data-mode="year">연도별</button>
+        <select id="acctOverviewFilterSite" class="history-site-filter">
+          <option value="">전체 현장</option>
+        </select>
+      </nav>
+      <section class="toolbar">
+        <div class="filters search-filters">
+          <select id="acctOverviewFilterDone">
+            <option value="">전체 상태</option>
+            <option value="0">미완료</option>
+            <option value="1">완료</option>
+          </select>
+          <input id="acctOverviewSearchInput" type="text" placeholder="현장명 또는 업무 내용 검색" />
+          <button id="acctOverviewSearchBtn" class="btn btn-primary">검색</button>
+          <button id="acctOverviewSearchResetBtn" class="btn btn-ghost">초기화</button>
+        </div>
+      </section>
+      <p id="acctOverviewSearchHint" class="search-hint hidden"></p>
+
+      <section class="table-wrap">
+        <table id="acctOverviewTable">
+          <thead>
+            <tr>
+              <th class="col-site" id="acctOverviewPeriodHeader">월</th>
+              <th class="col-cost">미완료 건수</th>
+              <th class="col-cost">완료 건수</th>
+              <th class="col-cost">합계 건수</th>
+              <th class="col-cost">참여 현장 수</th>
+            </tr>
+          </thead>
+          <tbody id="acctOverviewBody"></tbody>
+        </table>
+        <table id="acctOverviewSearchTable" class="hidden">
+          <thead>
+            <tr>
+              <th class="col-date">작업일</th>
+              <th class="col-site">현장명</th>
+              <th class="col-content-wide">업무</th>
+              <th class="col-date">마감기한</th>
+              <th class="col-check">완료</th>
+            </tr>
+          </thead>
+          <tbody id="acctOverviewSearchBody"></tbody>
+        </table>
+        <p id="acctOverviewEmptyMsg" class="empty-msg hidden">표시할 내역이 없습니다.</p>
+      </section>
+    </div>
+
     <!-- 후속 작업 화면 (앞으로 진행해야 하는 업무 등록/조회) -->
     <div id="followupSection" class="hidden">
       <section class="toolbar">
@@ -339,6 +392,7 @@
         <table id="followupTable">
           <thead>
             <tr>
+              <th class="col-no">No.</th>
               <th class="col-site">현장명</th>
               <th class="col-content-wide">내용</th>
               <th class="col-date">예정일</th>

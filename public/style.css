@@ -295,6 +295,8 @@ table { width: 100%; border-collapse: collapse; }
 #accountingTable { min-width: 720px; }
 #overviewTable { min-width: 500px; }
 #overviewSearchTable { min-width: 700px; }
+#acctOverviewTable { min-width: 500px; }
+#acctOverviewSearchTable { min-width: 700px; }
 
 thead th {
   text-align: left;
@@ -332,6 +334,8 @@ tbody tr.overdue-row td { border-bottom: 1px solid #f3ddc2; }
 td.col-cost { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .col-check { text-align: center; }
 td.col-check { text-align: center; }
+.col-no { text-align: center; width: 44px; white-space: nowrap; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+td.col-no { text-align: center; white-space: nowrap; }
 .col-manage { text-align: right; }
 td.col-manage { text-align: right; white-space: nowrap; }
 td.col-date { white-space: nowrap; }
@@ -376,24 +380,24 @@ td.site-badge {
 
 .empty-msg { text-align: center; color: var(--text-muted); padding: 30px 0; }
 
-/* ---------- 히스토리 / 작업내역 조회 (월별·연간 집계 표는 같은 구조를 공유합니다) ---------- */
-#historyTable .month-row, #overviewTable .month-row { cursor: pointer; }
-#historyTable .month-row:hover, #overviewTable .month-row:hover { background: var(--surface-soft); }
-#historyTable .month-row td, #overviewTable .month-row td { font-weight: 700; }
-#historyTable .period-cell, #overviewTable .period-cell { color: var(--navy); font-size: 15px; }
-#historyTable .expand-icon, #overviewTable .expand-icon {
+/* ---------- 히스토리 / 작업내역 조회 / 경리 업무일지 조회 (월별·연간 집계 표는 같은 구조를 공유합니다) ---------- */
+#historyTable .month-row, #overviewTable .month-row, #acctOverviewTable .month-row { cursor: pointer; }
+#historyTable .month-row:hover, #overviewTable .month-row:hover, #acctOverviewTable .month-row:hover { background: var(--surface-soft); }
+#historyTable .month-row td, #overviewTable .month-row td, #acctOverviewTable .month-row td { font-weight: 700; }
+#historyTable .period-cell, #overviewTable .period-cell, #acctOverviewTable .period-cell { color: var(--navy); font-size: 15px; }
+#historyTable .expand-icon, #overviewTable .expand-icon, #acctOverviewTable .expand-icon {
   display: inline-block;
   width: 15px;
   font-size: 11px;
   transition: transform 0.15s ease;
   color: var(--text-muted);
 }
-#historyTable .month-row.expanded .expand-icon, #overviewTable .month-row.expanded .expand-icon { transform: rotate(90deg); }
+#historyTable .month-row.expanded .expand-icon, #overviewTable .month-row.expanded .expand-icon, #acctOverviewTable .month-row.expanded .expand-icon { transform: rotate(90deg); }
 /* "현장별 보기 / 접기" 안내는 좁은 화면에서만 보여줍니다. */
-#historyTable .period-hint, #overviewTable .period-hint { display: none; }
-#historyTable .site-detail-row, #overviewTable .site-detail-row { cursor: pointer; }
-#historyTable .site-detail-row:hover td, #overviewTable .site-detail-row:hover td { background: #eef2f8; }
-#historyTable .site-detail-row td, #overviewTable .site-detail-row td {
+#historyTable .period-hint, #overviewTable .period-hint, #acctOverviewTable .period-hint { display: none; }
+#historyTable .site-detail-row, #overviewTable .site-detail-row, #acctOverviewTable .site-detail-row { cursor: pointer; }
+#historyTable .site-detail-row:hover td, #overviewTable .site-detail-row:hover td, #acctOverviewTable .site-detail-row:hover td { background: #eef2f8; }
+#historyTable .site-detail-row td, #overviewTable .site-detail-row td, #acctOverviewTable .site-detail-row td {
   background: var(--surface-soft);
   font-size: 13px;
   color: var(--text-muted);
@@ -401,13 +405,13 @@ td.site-badge {
   padding-top: 8px;
   padding-bottom: 8px;
 }
-#historyTable .site-detail-row .site-detail-name, #overviewTable .site-detail-row .site-detail-name {
+#historyTable .site-detail-row .site-detail-name, #overviewTable .site-detail-row .site-detail-name, #acctOverviewTable .site-detail-row .site-detail-name {
   color: var(--text);
   font-weight: 600;
   padding-left: 30px;
 }
-#historyTable .deficit, #overviewTable .deficit { color: var(--danger); font-weight: 700; }
-#historyTable .deficit-zero, #overviewTable .deficit-zero { color: var(--good-text); font-weight: 700; }
+#historyTable .deficit, #overviewTable .deficit, #acctOverviewTable .deficit { color: var(--danger); font-weight: 700; }
+#historyTable .deficit-zero, #overviewTable .deficit-zero, #acctOverviewTable .deficit-zero { color: var(--good-text); font-weight: 700; }
 
 /* ---------- 모달 ---------- */
 .modal-overlay {
@@ -452,11 +456,11 @@ td.site-badge {
   .brand-app { font-size: 22px; }
   .card-value { font-size: 24px; }
 
-  /* ---------- 상단 탭: 가로로 드래그하지 않고 2줄로 나눠서 표시 ----------
-     탭이 8개라 4개씩 정확히 2줄로 맞춰집니다. */
+  /* ---------- 상단 탭: 가로로 드래그하지 않고 여러 줄로 나눠서 표시 ----------
+     탭이 9개라 3개씩 정확히 3줄로 맞춰집니다. */
   .tab-bar {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 6px;
     overflow-x: visible;
   }
@@ -471,7 +475,7 @@ td.site-badge {
 
   /* ---------- 내역 목록 / 업무일지 / 경리 업무일지 / 후속작업 / 조회 검색결과: 표 -> 세로 카드 ----------
      같은 카드형 레이아웃을 여러 표(#recordsTable, #journalTable, #accountingTable,
-     #followupTable, #overviewSearchTable)가 함께 사용합니다. */
+     #followupTable, #overviewSearchTable, #acctOverviewSearchTable)가 함께 사용합니다. */
   #listSection .table-wrap,
   #journalSection .table-wrap,
   #accountingSection .table-wrap,
@@ -482,17 +486,18 @@ td.site-badge {
     border-radius: 0;
     box-shadow: none;
   }
-  #recordsTable, #journalTable, #accountingTable, #followupTable, #overviewSearchTable { min-width: 0; width: 100%; }
-  #recordsTable thead, #journalTable thead, #accountingTable thead, #followupTable thead, #overviewSearchTable thead { display: none; }
+  #recordsTable, #journalTable, #accountingTable, #followupTable, #overviewSearchTable, #acctOverviewSearchTable { min-width: 0; width: 100%; }
+  #recordsTable thead, #journalTable thead, #accountingTable thead, #followupTable thead, #overviewSearchTable thead, #acctOverviewSearchTable thead { display: none; }
   #recordsTable, #recordsTable tbody, #recordsTable tr, #recordsTable td,
   #journalTable, #journalTable tbody, #journalTable tr, #journalTable td,
   #accountingTable, #accountingTable tbody, #accountingTable tr, #accountingTable td,
   #followupTable, #followupTable tbody, #followupTable tr, #followupTable td,
-  #overviewSearchTable, #overviewSearchTable tbody, #overviewSearchTable tr, #overviewSearchTable td {
+  #overviewSearchTable, #overviewSearchTable tbody, #overviewSearchTable tr, #overviewSearchTable td,
+  #acctOverviewSearchTable, #acctOverviewSearchTable tbody, #acctOverviewSearchTable tr, #acctOverviewSearchTable td {
     display: block;
     width: 100%;
   }
-  #recordsTable tbody tr, #journalTable tbody tr, #accountingTable tbody tr, #followupTable tbody tr, #overviewSearchTable tbody tr {
+  #recordsTable tbody tr, #journalTable tbody tr, #accountingTable tbody tr, #followupTable tbody tr, #overviewSearchTable tbody tr, #acctOverviewSearchTable tbody tr {
     /* 위쪽의 일괄 width:100% 규칙 + 아래 margin 이 합쳐지면 카드가 좌우로
        margin 만큼 컨테이너 밖으로 삐져나가므로 width 를 auto 로 되돌립니다. */
     width: auto;
@@ -504,9 +509,9 @@ td.site-badge {
     overflow: hidden;
     box-shadow: var(--shadow);
   }
-  #recordsTable tbody tr.paid-row, #followupTable tbody tr.paid-row { border-color: var(--paid-row-border); }
+  #recordsTable tbody tr.paid-row, #followupTable tbody tr.paid-row, #acctOverviewSearchTable tbody tr.paid-row { border-color: var(--paid-row-border); }
   #followupTable tbody tr.overdue-row { border-color: #f3ddc2; }
-  #recordsTable tbody td, #journalTable tbody td, #accountingTable tbody td, #followupTable tbody td, #overviewSearchTable tbody td {
+  #recordsTable tbody td, #journalTable tbody td, #accountingTable tbody td, #followupTable tbody td, #overviewSearchTable tbody td, #acctOverviewSearchTable tbody td {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -519,8 +524,9 @@ td.site-badge {
   #journalTable tbody tr td:last-child,
   #accountingTable tbody tr td:last-child,
   #followupTable tbody tr td:last-child,
-  #overviewSearchTable tbody tr td:last-child { border-bottom: none; }
-  #recordsTable tbody td::before, #journalTable tbody td::before, #accountingTable tbody td::before, #followupTable tbody td::before, #overviewSearchTable tbody td::before {
+  #overviewSearchTable tbody tr td:last-child,
+  #acctOverviewSearchTable tbody tr td:last-child { border-bottom: none; }
+  #recordsTable tbody td::before, #journalTable tbody td::before, #accountingTable tbody td::before, #followupTable tbody td::before, #overviewSearchTable tbody td::before, #acctOverviewSearchTable tbody td::before {
     content: attr(data-label);
     font-size: 12px;
     font-weight: 700;
@@ -534,14 +540,15 @@ td.site-badge {
   #journalTable tbody td > .cell-value,
   #accountingTable tbody td > .cell-value,
   #followupTable tbody td > .cell-value,
-  #overviewSearchTable tbody td > .cell-value {
+  #overviewSearchTable tbody td > .cell-value,
+  #acctOverviewSearchTable tbody td > .cell-value {
     flex: 1 1 auto;
     min-width: 0;
     text-align: right;
     overflow-wrap: break-word;
     word-break: keep-all;
   }
-  #recordsTable td.site-badge, #journalTable td.site-badge, #accountingTable td.site-badge, #followupTable td.site-badge, #overviewSearchTable td.site-badge {
+  #recordsTable td.site-badge, #journalTable td.site-badge, #accountingTable td.site-badge, #followupTable td.site-badge, #overviewSearchTable td.site-badge, #acctOverviewSearchTable td.site-badge {
     font-size: 16px;
     color: var(--navy);
   }
@@ -549,7 +556,8 @@ td.site-badge {
   #journalTable td.content-cell-wide,
   #accountingTable td.content-cell-wide,
   #followupTable td.content-cell-wide,
-  #overviewSearchTable td.content-cell-wide {
+  #overviewSearchTable td.content-cell-wide,
+  #acctOverviewSearchTable td.content-cell-wide {
     max-width: none;
     overflow: visible;
     text-overflow: initial;
@@ -559,29 +567,32 @@ td.site-badge {
     content: none;
   }
   #recordsTable td.col-manage, #journalTable td.col-manage, #accountingTable td.col-manage, #followupTable td.col-manage { justify-content: flex-end; }
+  /* No. 열은 카드형 레이아웃에서는 순서가 위->아래로 이미 드러나므로 굳이 표시하지 않습니다. */
+  #followupTable td.col-no { display: none; }
   #recordsTable .edit-input, #journalTable .edit-input, #accountingTable .edit-input, #followupTable .edit-input { width: auto; max-width: 200px; margin-left: auto; }
   #recordsTable select.edit-input, #journalTable select.edit-input, #accountingTable select.edit-input, #followupTable select.edit-input { min-width: 0; }
 
-  /* ---------- 히스토리 / 작업내역 조회: 표 -> 세로 카드 ----------
+  /* ---------- 히스토리 / 작업내역 조회 / 경리 업무일지 조회: 표 -> 세로 카드 ----------
      가로로 드래그해서 봐야 했던 월/현장별 집계를, 항목을 아래로 쌓아
-     세로 스크롤만으로 볼 수 있게 바꿉니다. #historyTable, #overviewTable 공통. */
-  #historyView .table-wrap, #overviewSection .table-wrap {
+     세로 스크롤만으로 볼 수 있게 바꿉니다. #historyTable, #overviewTable, #acctOverviewTable 공통. */
+  #historyView .table-wrap, #overviewSection .table-wrap, #accountingOverviewSection .table-wrap {
     overflow-x: visible;
     border: none;
     background: transparent;
     border-radius: 0;
     box-shadow: none;
   }
-  #historyTable, #overviewTable { min-width: 0; width: 100%; }
-  #historyTable thead, #overviewTable thead { display: none; }
+  #historyTable, #overviewTable, #acctOverviewTable { min-width: 0; width: 100%; }
+  #historyTable thead, #overviewTable thead, #acctOverviewTable thead { display: none; }
   #historyTable, #historyTable tbody, #historyTable tr, #historyTable td,
-  #overviewTable, #overviewTable tbody, #overviewTable tr, #overviewTable td {
+  #overviewTable, #overviewTable tbody, #overviewTable tr, #overviewTable td,
+  #acctOverviewTable, #acctOverviewTable tbody, #acctOverviewTable tr, #acctOverviewTable td {
     display: block;
     width: 100%;
   }
 
   /* 월(연도) 카드 */
-  #historyTable tbody tr.month-row, #overviewTable tbody tr.month-row {
+  #historyTable tbody tr.month-row, #overviewTable tbody tr.month-row, #acctOverviewTable tbody tr.month-row {
     width: auto;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -592,9 +603,9 @@ td.site-badge {
     box-shadow: var(--shadow);
   }
   /* 상세가 펼쳐진 달은 아래 현장 카드들과 한 덩어리로 보이도록 붙입니다. */
-  #historyTable tbody tr.month-row.expanded, #overviewTable tbody tr.month-row.expanded { margin-bottom: 0; }
+  #historyTable tbody tr.month-row.expanded, #overviewTable tbody tr.month-row.expanded, #acctOverviewTable tbody tr.month-row.expanded { margin-bottom: 0; }
 
-  #historyTable tbody tr.month-row td, #overviewTable tbody tr.month-row td {
+  #historyTable tbody tr.month-row td, #overviewTable tbody tr.month-row td, #acctOverviewTable tbody tr.month-row td {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -604,21 +615,21 @@ td.site-badge {
     font-weight: 600;
     white-space: normal;
   }
-  #historyTable tbody tr.month-row td:last-child, #overviewTable tbody tr.month-row td:last-child { border-bottom: none; }
-  #historyTable tbody tr.month-row td::before, #overviewTable tbody tr.month-row td::before {
+  #historyTable tbody tr.month-row td:last-child, #overviewTable tbody tr.month-row td:last-child, #acctOverviewTable tbody tr.month-row td:last-child { border-bottom: none; }
+  #historyTable tbody tr.month-row td::before, #overviewTable tbody tr.month-row td::before, #acctOverviewTable tbody tr.month-row td::before {
     content: attr(data-label);
     font-size: 12px;
     font-weight: 700;
     color: var(--text-muted);
     flex: 0 0 auto;
   }
-  #historyTable tbody tr.month-row td > .cell-value, #overviewTable tbody tr.month-row td > .cell-value {
+  #historyTable tbody tr.month-row td > .cell-value, #overviewTable tbody tr.month-row td > .cell-value, #acctOverviewTable tbody tr.month-row td > .cell-value {
     flex: 1 1 auto;
     min-width: 0;
     text-align: right;
   }
   /* 카드 머리글(월/연도) — 누르면 현장별 상세가 펼쳐집니다. */
-  #historyTable tbody tr.month-row td.period-cell, #overviewTable tbody tr.month-row td.period-cell {
+  #historyTable tbody tr.month-row td.period-cell, #overviewTable tbody tr.month-row td.period-cell, #acctOverviewTable tbody tr.month-row td.period-cell {
     background: var(--navy-soft-bg);
     border-bottom: 1px solid var(--border);
     padding: 12px 16px;
@@ -628,12 +639,12 @@ td.site-badge {
     justify-content: flex-start;
     gap: 8px;
   }
-  #historyTable tbody tr.month-row td.period-cell::before, #overviewTable tbody tr.month-row td.period-cell::before { content: none; }
-  #historyTable tbody tr.month-row td.period-cell > .cell-value, #overviewTable tbody tr.month-row td.period-cell > .cell-value {
+  #historyTable tbody tr.month-row td.period-cell::before, #overviewTable tbody tr.month-row td.period-cell::before, #acctOverviewTable tbody tr.month-row td.period-cell::before { content: none; }
+  #historyTable tbody tr.month-row td.period-cell > .cell-value, #overviewTable tbody tr.month-row td.period-cell > .cell-value, #acctOverviewTable tbody tr.month-row td.period-cell > .cell-value {
     text-align: left;
     flex: 1 1 auto;
   }
-  #historyTable .period-hint, #overviewTable .period-hint {
+  #historyTable .period-hint, #overviewTable .period-hint, #acctOverviewTable .period-hint {
     display: inline;
     font-size: 11.5px;
     font-weight: 600;
@@ -642,7 +653,7 @@ td.site-badge {
   }
 
   /* 현장별 상세 카드 */
-  #historyTable tbody tr.site-detail-row, #overviewTable tbody tr.site-detail-row {
+  #historyTable tbody tr.site-detail-row, #overviewTable tbody tr.site-detail-row, #acctOverviewTable tbody tr.site-detail-row {
     width: auto;
     background: var(--surface-soft);
     border: 1px solid var(--border);
@@ -651,12 +662,12 @@ td.site-badge {
     padding: 4px 0;
     overflow: hidden;
   }
-  #historyTable tbody tr.site-detail-row.last-detail, #overviewTable tbody tr.site-detail-row.last-detail {
+  #historyTable tbody tr.site-detail-row.last-detail, #overviewTable tbody tr.site-detail-row.last-detail, #acctOverviewTable tbody tr.site-detail-row.last-detail {
     border-bottom-left-radius: var(--radius);
     border-bottom-right-radius: var(--radius);
     margin-bottom: 10px;
   }
-  #historyTable tbody tr.site-detail-row td, #overviewTable tbody tr.site-detail-row td {
+  #historyTable tbody tr.site-detail-row td, #overviewTable tbody tr.site-detail-row td, #acctOverviewTable tbody tr.site-detail-row td {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -667,21 +678,21 @@ td.site-badge {
     font-size: 13.5px;
     white-space: normal;
   }
-  #historyTable tbody tr.site-detail-row td::before, #overviewTable tbody tr.site-detail-row td::before {
+  #historyTable tbody tr.site-detail-row td::before, #overviewTable tbody tr.site-detail-row td::before, #acctOverviewTable tbody tr.site-detail-row td::before {
     content: attr(data-label);
     font-size: 12px;
     font-weight: 700;
     color: var(--text-muted);
     flex: 0 0 auto;
   }
-  #historyTable tbody tr.site-detail-row td > .cell-value, #overviewTable tbody tr.site-detail-row td > .cell-value {
+  #historyTable tbody tr.site-detail-row td > .cell-value, #overviewTable tbody tr.site-detail-row td > .cell-value, #acctOverviewTable tbody tr.site-detail-row td > .cell-value {
     flex: 1 1 auto;
     min-width: 0;
     text-align: right;
     overflow-wrap: break-word;
     word-break: keep-all;
   }
-  #historyTable tbody tr.site-detail-row td.site-detail-name, #overviewTable tbody tr.site-detail-row td.site-detail-name {
+  #historyTable tbody tr.site-detail-row td.site-detail-name, #overviewTable tbody tr.site-detail-row td.site-detail-name, #acctOverviewTable tbody tr.site-detail-row td.site-detail-name {
     padding-left: 16px;
     padding-top: 10px;
     white-space: normal;
@@ -689,8 +700,8 @@ td.site-badge {
     font-weight: 700;
     color: var(--navy);
   }
-  #historyTable tbody tr.site-detail-row td.site-detail-name::before, #overviewTable tbody tr.site-detail-row td.site-detail-name::before { content: none; }
-  #historyTable tbody tr.site-detail-row td.site-detail-name > .cell-value, #overviewTable tbody tr.site-detail-row td.site-detail-name > .cell-value { text-align: left; }
+  #historyTable tbody tr.site-detail-row td.site-detail-name::before, #overviewTable tbody tr.site-detail-row td.site-detail-name::before, #acctOverviewTable tbody tr.site-detail-row td.site-detail-name::before { content: none; }
+  #historyTable tbody tr.site-detail-row td.site-detail-name > .cell-value, #overviewTable tbody tr.site-detail-row td.site-detail-name > .cell-value, #acctOverviewTable tbody tr.site-detail-row td.site-detail-name > .cell-value { text-align: left; }
 
   /* ---------- 업무일지 다운로드 바 / 조회 검색창: 모바일에서 세로로 쌓기 ---------- */
   .export-bar { flex-direction: column; align-items: stretch; }

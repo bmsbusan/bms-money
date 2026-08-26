@@ -114,6 +114,23 @@
   const downloadAccountingBtn = $("#downloadAccountingBtn");
   const accountingExportError = $("#accountingExportError");
 
+  // ---------- 경리 업무일지 조회 화면 요소 ----------
+  const accountingOverviewSection = $("#accountingOverviewSection");
+  const acctOverviewModeMonthBtn = $("#acctOverviewModeMonthBtn");
+  const acctOverviewModeYearBtn = $("#acctOverviewModeYearBtn");
+  const acctOverviewPeriodHeader = $("#acctOverviewPeriodHeader");
+  const acctOverviewFilterSite = $("#acctOverviewFilterSite");
+  const acctOverviewFilterDone = $("#acctOverviewFilterDone");
+  const acctOverviewSearchInput = $("#acctOverviewSearchInput");
+  const acctOverviewSearchBtn = $("#acctOverviewSearchBtn");
+  const acctOverviewSearchResetBtn = $("#acctOverviewSearchResetBtn");
+  const acctOverviewSearchHint = $("#acctOverviewSearchHint");
+  const acctOverviewTable = $("#acctOverviewTable");
+  const acctOverviewBody = $("#acctOverviewBody");
+  const acctOverviewSearchTable = $("#acctOverviewSearchTable");
+  const acctOverviewSearchBody = $("#acctOverviewSearchBody");
+  const acctOverviewEmptyMsg = $("#acctOverviewEmptyMsg");
+
   // ---------- 후속 작업 화면 요소 ----------
   const followupSection = $("#followupSection");
   const followupFilterSite = $("#followupFilterSite");
@@ -152,7 +169,7 @@
   let records = [];
   let editingId = null;
   let pollTimer = null;
-  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "accounting" | "followup" | "overview"
+  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "accounting" | "accountingOverview" | "followup" | "overview"
   let historyRows = [];
   let expandedMonths = new Set();
   let historyMode = "month"; // "month" | "year"
@@ -166,6 +183,14 @@
   // 경리 업무일지 상태
   let accountingEntries = [];
   let editingAccountingId = null;
+
+  // 경리 업무일지 조회 상태
+  let acctOverviewSummaryRows = [];
+  let acctOverviewSearchResults = [];
+  let acctOverviewMode = "month"; // "month" | "year"
+  let acctOverviewExpandedPeriods = new Set();
+  let acctOverviewSearching = false;
+  let acctOverviewDrilldownMonth = ""; // 월별 집계에서 현장별 상세를 눌러 들어왔을 때의 월(YYYY-MM)
 
   // 후속 작업 상태
   let followupEntries = [];
@@ -241,6 +266,7 @@
       history: historyView,
       journal: journalSection,
       accounting: accountingSection,
+      accountingOverview: accountingOverviewSection,
       followup: followupSection,
       overview: overviewSection,
     };
@@ -255,6 +281,8 @@
       loadJournal();
     } else if (tab === "accounting") {
       loadAccounting();
+    } else if (tab === "accountingOverview") {
+      loadAccountingOverview();
     } else if (tab === "followup") {
       loadFollowups();
     } else if (tab === "overview") {
@@ -296,6 +324,8 @@
       if (editingJournalId === null) loadJournal();
     } else if (activeTab === "accounting") {
       if (editingAccountingId === null) loadAccounting();
+    } else if (activeTab === "accountingOverview") {
+      loadAccountingOverview();
     } else if (activeTab === "followup") {
       if (editingFollowupId === null) loadFollowups();
     } else if (activeTab === "overview") {
@@ -324,6 +354,7 @@
   async function loadSites() {
     const data = await api("/api/sites");
     sites = data.sites;
+    sites.sort((a, b) => a.name.localeCompare(b.name, "ko"));
     renderSiteSelects();
     renderSiteModalList();
   }
@@ -341,6 +372,7 @@
       [newJournalSite, pickOpts],
       [accountingFilterSite, filterOpts],
       [newAccountingSite, pickOpts],
+      [acctOverviewFilterSite, filterOpts],
       [followupFilterSite, filterOpts],
       [newFollowupSite, pickOpts],
       [overviewFilterSite, filterOpts],
@@ -1790,6 +1822,231 @@
     }
   });
 
+  // ================= 경리 업무일지 조회 (월별/연간 통합 + 검색) =================
+  // "경리 업무일지"(accounting_journal) 데이터를 월별/연도별로 집계해서 보여주고,
+  // 현장별 상세 드릴다운 및 현장명/업무 키워드·완료여부 검색을 제공합니다.
+
+  async function loadAccountingOverview() {
+    if (acctOverviewSearching) {
+      await runAcctOverviewSearch();
+    } else {
+      await loadAcctOverviewSummary();
+    }
+  }
+
+  async function loadAcctOverviewSummary() {
+    const data = await api("/api/accounting-summary");
+    acctOverviewSummaryRows = data.rows || [];
+    renderAcctOverviewSummary();
+  }
+
+  function switchAcctOverviewMode(mode) {
+    acctOverviewMode = mode;
+    acctOverviewModeMonthBtn.classList.toggle("subtab-active", mode === "month");
+    acctOverviewModeYearBtn.classList.toggle("subtab-active", mode === "year");
+    acctOverviewPeriodHeader.textContent = mode === "month" ? "월" : "연도";
+    acctOverviewExpandedPeriods.clear();
+    renderAcctOverviewSummary();
+  }
+  acctOverviewModeMonthBtn.addEventListener("click", () => switchAcctOverviewMode("month"));
+  acctOverviewModeYearBtn.addEventListener("click", () => switchAcctOverviewMode("year"));
+  acctOverviewFilterSite.addEventListener("change", () => {
+    if (acctOverviewSearching) {
+      runAcctOverviewSearch();
+    } else {
+      acctOverviewExpandedPeriods.clear();
+      renderAcctOverviewSummary();
+    }
+  });
+  acctOverviewFilterDone.addEventListener("change", () => {
+    if (acctOverviewSearching) {
+      runAcctOverviewSearch();
+    } else {
+      acctOverviewExpandedPeriods.clear();
+      renderAcctOverviewSummary();
+    }
+  });
+
+  function renderAcctOverviewSummary() {
+    acctOverviewSearchTable.classList.add("hidden");
+    acctOverviewTable.classList.remove("hidden");
+
+    const siteFilter = acctOverviewFilterSite.value;
+    const doneFilter = acctOverviewFilterDone.value; // "" | "0" | "1"
+    const filteredRows = acctOverviewSummaryRows.filter((r) => {
+      if (siteFilter && r.site_name !== siteFilter) return false;
+      if (doneFilter !== "" && String(r.done) !== doneFilter) return false;
+      return true;
+    });
+
+    if (filteredRows.length === 0) {
+      acctOverviewBody.innerHTML = "";
+      acctOverviewEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    acctOverviewEmptyMsg.classList.add("hidden");
+
+    const byPeriod = new Map();
+    for (const row of filteredRows) {
+      const m = row.month || "미상";
+      const key = acctOverviewMode === "year" ? (m.slice(0, 4) || "미상") : m;
+      if (!byPeriod.has(key)) {
+        byPeriod.set(key, { period: key, doneCount: 0, undoneCount: 0, sitesMap: new Map() });
+      }
+      const bucket = byPeriod.get(key);
+      const s = bucket.sitesMap.get(row.site_name) || { site_name: row.site_name, doneCount: 0, undoneCount: 0 };
+      if (Number(row.done)) {
+        bucket.doneCount += row.count;
+        s.doneCount += row.count;
+      } else {
+        bucket.undoneCount += row.count;
+        s.undoneCount += row.count;
+      }
+      bucket.sitesMap.set(row.site_name, s);
+    }
+
+    const periods = Array.from(byPeriod.values()).sort((a, b) => (a.period < b.period ? 1 : -1));
+
+    acctOverviewBody.innerHTML = periods
+      .map((m) => {
+        const isExpanded = acctOverviewExpandedPeriods.has(m.period);
+        const siteRows = Array.from(m.sitesMap.values()).sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
+        const total = m.doneCount + m.undoneCount;
+        const detailRows = isExpanded
+          ? siteRows
+              .map((s, i) => {
+                const siteTotal = s.doneCount + s.undoneCount;
+                return `
+              <tr class="site-detail-row ${i === siteRows.length - 1 ? "last-detail" : ""}" data-period="${m.period}" data-site="${escapeHtml(s.site_name)}">
+                <td class="site-detail-name" data-label="현장명"><span class="cell-value">${escapeHtml(s.site_name)}</span></td>
+                <td class="col-cost" data-label="미완료 건수"><span class="cell-value">${s.undoneCount}건</span></td>
+                <td class="col-cost" data-label="완료 건수"><span class="cell-value">${s.doneCount}건</span></td>
+                <td class="col-cost" data-label="합계 건수"><span class="cell-value">${siteTotal}건</span></td>
+                <td class="col-cost" data-label="참여 현장 수"><span class="cell-value">-</span></td>
+              </tr>`;
+              })
+              .join("")
+          : "";
+        const periodLabel = acctOverviewMode === "year" ? m.period + "년" : m.period;
+        return `
+          <tr class="month-row ${isExpanded ? "expanded" : ""}" data-period="${m.period}">
+            <td class="period-cell" data-label="${acctOverviewMode === "year" ? "연도" : "월"}">
+              <span class="expand-icon">▶</span><span class="cell-value">${escapeHtml(periodLabel)}</span><span class="period-hint">${isExpanded ? "접기" : "현장별 보기"}</span>
+            </td>
+            <td class="col-cost" data-label="미완료 건수"><span class="cell-value">${m.undoneCount}건</span></td>
+            <td class="col-cost" data-label="완료 건수"><span class="cell-value">${m.doneCount}건</span></td>
+            <td class="col-cost" data-label="합계 건수"><span class="cell-value">${total}건</span></td>
+            <td class="col-cost" data-label="참여 현장 수"><span class="cell-value">${m.sitesMap.size}곳</span></td>
+          </tr>
+          ${detailRows}`;
+      })
+      .join("");
+  }
+
+  acctOverviewBody.addEventListener("click", (e) => {
+    const detail = e.target.closest(".site-detail-row");
+    if (detail) {
+      if (acctOverviewMode === "year") return;
+      const site = detail.getAttribute("data-site") || "";
+      const period = detail.getAttribute("data-period") || "";
+      drilldownAcctOverview(site, period);
+      return;
+    }
+    const row = e.target.closest(".month-row");
+    if (!row) return;
+    const period = row.getAttribute("data-period");
+    if (acctOverviewExpandedPeriods.has(period)) acctOverviewExpandedPeriods.delete(period);
+    else acctOverviewExpandedPeriods.add(period);
+    renderAcctOverviewSummary();
+  });
+
+  // 현장별 상세 줄을 누르면, 그 현장·그 달의 실제 경리 업무일지 내역을
+  // 검색 결과와 같은 형태로 바로 보여줍니다.
+  async function drilldownAcctOverview(site, month) {
+    acctOverviewSearching = true;
+    acctOverviewFilterSite.value = site;
+    acctOverviewSearchInput.value = "";
+    await runAcctOverviewSearch({ month });
+  }
+
+  async function fetchAcctOverviewEntries({ keyword = "", month = "" } = {}) {
+    const site = acctOverviewFilterSite.value;
+    const done = acctOverviewFilterDone.value;
+    const params = new URLSearchParams({ sort: "desc" });
+    if (keyword) params.set("keyword", keyword);
+    if (site) params.set("site", site);
+    if (done !== "") params.set("done", done);
+    if (month) {
+      params.set("from", `${month}-01`);
+      params.set("to", `${month}-31`);
+    }
+    const data = await api(`/api/accounting?${params.toString()}`);
+    return data.entries || [];
+  }
+
+  async function runAcctOverviewSearch(opts = {}) {
+    const keyword = acctOverviewSearchInput.value.trim();
+    const month = opts.month !== undefined ? opts.month : acctOverviewDrilldownMonth;
+    acctOverviewDrilldownMonth = month;
+    acctOverviewSearchResults = await fetchAcctOverviewEntries({ keyword, month });
+    renderAcctOverviewSearch(keyword, month);
+  }
+
+  function renderAcctOverviewSearch(keyword, month) {
+    acctOverviewTable.classList.add("hidden");
+    acctOverviewSearchTable.classList.remove("hidden");
+
+    acctOverviewSearchHint.classList.remove("hidden");
+    if (keyword) {
+      acctOverviewSearchHint.textContent = `"${keyword}" 검색 결과 ${acctOverviewSearchResults.length}건`;
+    } else if (month) {
+      acctOverviewSearchHint.textContent = `${acctOverviewFilterSite.value || "전체 현장"} · ${month} 전체 내역 ${acctOverviewSearchResults.length}건`;
+    } else {
+      acctOverviewSearchHint.textContent = `전체 내역 ${acctOverviewSearchResults.length}건`;
+    }
+
+    if (acctOverviewSearchResults.length === 0) {
+      acctOverviewSearchBody.innerHTML = "";
+      acctOverviewEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    acctOverviewEmptyMsg.classList.add("hidden");
+
+    acctOverviewSearchBody.innerHTML = acctOverviewSearchResults
+      .map(
+        (r) => `
+        <tr class="${r.done ? "paid-row" : ""}">
+          <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+          <td class="site-badge" data-label="현장명"><span class="cell-value">${highlightKeyword(r.site_name, keyword)}</span></td>
+          <td class="content-cell-wide" data-label="업무"><span class="cell-value">${highlightKeyword(r.content, keyword)}</span></td>
+          <td class="col-date" data-label="마감기한"><span class="cell-value">${escapeHtml(r.due_date) || "-"}</span></td>
+          <td class="col-check" data-label="완료"><span class="cell-value">${r.done ? "✅ 완료" : "미완료"}</span></td>
+        </tr>`
+      )
+      .join("");
+  }
+
+  acctOverviewSearchBtn.addEventListener("click", async () => {
+    acctOverviewSearching = true;
+    await runAcctOverviewSearch({ month: "" });
+  });
+  acctOverviewSearchInput.addEventListener("keydown", async (e) => {
+    if (e.key === "Enter") {
+      acctOverviewSearching = true;
+      await runAcctOverviewSearch({ month: "" });
+    }
+  });
+  acctOverviewSearchResetBtn.addEventListener("click", async () => {
+    acctOverviewSearching = false;
+    acctOverviewDrilldownMonth = "";
+    acctOverviewSearchInput.value = "";
+    acctOverviewFilterSite.value = "";
+    acctOverviewFilterDone.value = "";
+    acctOverviewSearchHint.classList.add("hidden");
+    acctOverviewExpandedPeriods.clear();
+    await loadAcctOverviewSummary();
+  });
+
   // ================= 후속 작업 (앞으로 진행해야 하는 업무 등록/조회) =================
 
   async function loadFollowups() {
@@ -1798,6 +2055,8 @@
     if (followupFilterStatus.value !== "") params.set("status", followupFilterStatus.value);
     const data = await api(`/api/followups?${params.toString()}`);
     followupEntries = data.followups;
+    // 현장명 가나다순으로 정렬(같은 현장 안에서는 서버가 내려준 순서(완료여부/예정일 등)를 그대로 유지)
+    followupEntries.sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
     renderFollowups();
   }
 
@@ -1861,14 +2120,15 @@
     }
     followupEmptyMsg.classList.add("hidden");
     followupBody.innerHTML = followupEntries
-      .map((r) => (editingFollowupId === r.id ? followupEditRowHtml(r) : followupViewRowHtml(r)))
+      .map((r, i) => (editingFollowupId === r.id ? followupEditRowHtml(r, i) : followupViewRowHtml(r, i)))
       .join("");
   }
 
-  function followupViewRowHtml(r) {
+  function followupViewRowHtml(r, i) {
     const rowClass = r.status ? "paid-row" : isOverdue(r) ? "overdue-row" : "";
     return `
       <tr class="${rowClass}" data-id="${r.id}">
+        <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
         <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
         <td class="content-cell-wide" data-label="내용"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
         <td class="col-date" data-label="예정일"><span class="cell-value">${escapeHtml(r.due_date) || "-"}</span></td>
@@ -1885,12 +2145,13 @@
       </tr>`;
   }
 
-  function followupEditRowHtml(r) {
+  function followupEditRowHtml(r, i) {
     const siteOpts = sites
       .map((s) => `<option value="${escapeHtml(s.name)}" ${s.name === r.site_name ? "selected" : ""}>${escapeHtml(s.name)}</option>`)
       .join("");
     return `
       <tr data-id="${r.id}">
+        <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
         <td data-label="현장명"><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
         <td data-label="내용"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
         <td class="col-date" data-label="예정일"><input class="edit-input" type="date" data-edit="due_date" value="${r.due_date || ""}" /></td>

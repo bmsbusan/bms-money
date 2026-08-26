@@ -564,6 +564,21 @@ async function handleDeleteAccounting(id, env) {
   return json({ ok: true });
 }
 
+async function handleAccountingSummary(env) {
+  // 월 + 현장 + 완료여부별 건수 집계 (프론트에서 월별/연도별로 다시 묶어서 보여줍니다)
+  const { results } = await env.DB.prepare(
+    `SELECT
+       strftime('%Y-%m', work_date) AS month,
+       site_name,
+       done,
+       COUNT(*) AS count
+     FROM accounting_journal
+     GROUP BY month, site_name, done
+     ORDER BY month DESC, site_name ASC`
+  ).all();
+  return json({ rows: results });
+}
+
 // ---- 후속 작업 (followups) ----
 
 function rowToFollowup(row) {
@@ -795,6 +810,9 @@ export default {
       }
       if (accountingMatch && method === "DELETE") {
         return await handleDeleteAccounting(Number(accountingMatch[1]), env);
+      }
+      if (path === "/api/accounting-summary" && method === "GET") {
+        return await handleAccountingSummary(env);
       }
 
       if (path === "/api/followups" && method === "GET") {
