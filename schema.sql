@@ -57,12 +57,32 @@ CREATE TABLE IF NOT EXISTS journal_entries (
   site_name TEXT NOT NULL,
   content TEXT DEFAULT '',             -- 작업내역
   remarks TEXT DEFAULT '',             -- 비고
+  done INTEGER NOT NULL DEFAULT 0,     -- 완료 여부 (0/1)
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_journal_site ON journal_entries(site_name);
 CREATE INDEX IF NOT EXISTS idx_journal_date ON journal_entries(work_date);
+CREATE INDEX IF NOT EXISTS idx_journal_done ON journal_entries(done);
+
+-- ============================================================
+-- 경리 업무일지 (하루 단위 업무 기록: No / 현장 / 업무 / 마감기한 / 완료)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS accounting_journal (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  work_date TEXT NOT NULL,             -- 이 일지가 속한 날짜 YYYY-MM-DD
+  site_name TEXT NOT NULL,
+  content TEXT DEFAULT '',             -- 업무 내용
+  due_date TEXT,                       -- 마감기한 YYYY-MM-DD (선택)
+  done INTEGER NOT NULL DEFAULT 0,     -- 완료 여부 (0/1)
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_acct_journal_date ON accounting_journal(work_date);
+CREATE INDEX IF NOT EXISTS idx_acct_journal_site ON accounting_journal(site_name);
+CREATE INDEX IF NOT EXISTS idx_acct_journal_done ON accounting_journal(done);
 
 -- ============================================================
 -- 후속 작업 (앞으로 진행해야 하는 업무 등록 / 조회)

@@ -73,6 +73,7 @@
   const journalSection = $("#journalSection");
   const journalFilterSite = $("#journalFilterSite");
   const journalFilterMonth = $("#journalFilterMonth");
+  const journalFilterDone = $("#journalFilterDone");
   const journalFilterResetBtn = $("#journalFilterResetBtn");
   const addJournalBtn = $("#addJournalBtn");
   const journalAddForm = $("#journalAddForm");
@@ -90,6 +91,28 @@
   const downloadWeeklyBtn = $("#downloadWeeklyBtn");
   const downloadMonthlyBtn = $("#downloadMonthlyBtn");
   const exportError = $("#exportError");
+
+  // ---------- 경리 업무일지 화면 요소 ----------
+  const accountingSection = $("#accountingSection");
+  const accountingFilterSite = $("#accountingFilterSite");
+  const accountingFilterDate = $("#accountingFilterDate");
+  const accountingFilterDone = $("#accountingFilterDone");
+  const accountingFilterResetBtn = $("#accountingFilterResetBtn");
+  const addAccountingBtn = $("#addAccountingBtn");
+  const accountingAddForm = $("#accountingAddForm");
+  const newAccountingDate = $("#newAccountingDate");
+  const newAccountingSite = $("#newAccountingSite");
+  const newAccountingContent = $("#newAccountingContent");
+  const newAccountingDue = $("#newAccountingDue");
+  const newAccountingDone = $("#newAccountingDone");
+  const saveAccountingBtn = $("#saveAccountingBtn");
+  const cancelAccountingBtn = $("#cancelAccountingBtn");
+  const accountingAddError = $("#accountingAddError");
+  const accountingBody = $("#accountingBody");
+  const accountingEmptyMsg = $("#accountingEmptyMsg");
+  const accountingDayPicker = $("#accountingDayPicker");
+  const downloadAccountingBtn = $("#downloadAccountingBtn");
+  const accountingExportError = $("#accountingExportError");
 
   // ---------- 후속 작업 화면 요소 ----------
   const followupSection = $("#followupSection");
@@ -129,7 +152,7 @@
   let records = [];
   let editingId = null;
   let pollTimer = null;
-  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "followup" | "overview"
+  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "accounting" | "followup" | "overview"
   let historyRows = [];
   let expandedMonths = new Set();
   let historyMode = "month"; // "month" | "year"
@@ -139,6 +162,10 @@
   // 업무일지 상태
   let journalEntries = [];
   let editingJournalId = null;
+
+  // 경리 업무일지 상태
+  let accountingEntries = [];
+  let editingAccountingId = null;
 
   // 후속 작업 상태
   let followupEntries = [];
@@ -213,6 +240,7 @@
     const sectionsByTab = {
       history: historyView,
       journal: journalSection,
+      accounting: accountingSection,
       followup: followupSection,
       overview: overviewSection,
     };
@@ -225,6 +253,8 @@
       loadMonthlySummary();
     } else if (tab === "journal") {
       loadJournal();
+    } else if (tab === "accounting") {
+      loadAccounting();
     } else if (tab === "followup") {
       loadFollowups();
     } else if (tab === "overview") {
@@ -264,6 +294,8 @@
       loadMonthlySummary();
     } else if (activeTab === "journal") {
       if (editingJournalId === null) loadJournal();
+    } else if (activeTab === "accounting") {
+      if (editingAccountingId === null) loadAccounting();
     } else if (activeTab === "followup") {
       if (editingFollowupId === null) loadFollowups();
     } else if (activeTab === "overview") {
@@ -307,6 +339,8 @@
       [historyFilterSite, filterOpts],
       [journalFilterSite, filterOpts],
       [newJournalSite, pickOpts],
+      [accountingFilterSite, filterOpts],
+      [newAccountingSite, pickOpts],
       [followupFilterSite, filterOpts],
       [newFollowupSite, pickOpts],
       [overviewFilterSite, filterOpts],
@@ -799,6 +833,7 @@
     const params = new URLSearchParams();
     if (journalFilterSite.value) params.set("site", journalFilterSite.value);
     if (journalFilterMonth.value) params.set("month", journalFilterMonth.value);
+    if (journalFilterDone.value !== "") params.set("done", journalFilterDone.value);
     const data = await api(`/api/journal?${params.toString()}`);
     journalEntries = data.entries;
     rebuildJournalMonthFilterOptions();
@@ -816,9 +851,11 @@
 
   journalFilterSite.addEventListener("change", loadJournal);
   journalFilterMonth.addEventListener("change", loadJournal);
+  journalFilterDone.addEventListener("change", loadJournal);
   journalFilterResetBtn.addEventListener("click", () => {
     journalFilterSite.value = "";
     journalFilterMonth.value = "";
+    journalFilterDone.value = "";
     loadJournal();
   });
 
@@ -878,11 +915,14 @@
 
   function journalViewRowHtml(r) {
     return `
-      <tr data-id="${r.id}">
+      <tr class="${r.done ? "paid-row" : ""}" data-id="${r.id}">
         <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
         <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
         <td class="content-cell-wide" data-label="작업내역"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
         <td class="content-cell-wide" data-label="비고"><span class="cell-value">${escapeHtml(r.remarks) || "-"}</span></td>
+        <td class="col-check" data-label="완료">
+          <input type="checkbox" data-action="toggle-journal-done" data-id="${r.id}" ${r.done ? "checked" : ""} />
+        </td>
         <td class="col-manage" data-label="관리">
           <span class="row-actions">
             <button class="btn btn-ghost btn-sm" data-action="edit-journal" data-id="${r.id}">수정</button>
@@ -902,6 +942,9 @@
         <td data-label="현장명"><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
         <td data-label="작업내역"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
         <td data-label="비고"><input class="edit-input" data-edit="remarks" value="${escapeHtml(r.remarks)}" /></td>
+        <td class="col-check" data-label="완료">
+          <input type="checkbox" data-edit="done" ${r.done ? "checked" : ""} />
+        </td>
         <td class="col-manage" data-label="관리">
           <span class="row-actions">
             <button class="btn btn-primary btn-sm" data-action="save-edit-journal" data-id="${r.id}">저장</button>
@@ -929,6 +972,7 @@
         site_name: row.querySelector('[data-edit="site_name"]').value,
         content: row.querySelector('[data-edit="content"]').value,
         remarks: row.querySelector('[data-edit="remarks"]').value,
+        done: row.querySelector('[data-edit="done"]').checked,
       };
       try {
         await api(`/api/journal/${id}`, { method: "PUT", body: JSON.stringify(patch) });
@@ -941,6 +985,19 @@
       if (!confirm("이 업무일지를 삭제할까요?")) return;
       try {
         await api(`/api/journal/${id}`, { method: "DELETE" });
+        await loadJournal();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  journalBody.addEventListener("change", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (action === "toggle-journal-done" && id) {
+      try {
+        await api(`/api/journal/${id}`, { method: "PUT", body: JSON.stringify({ done: e.target.checked }) });
         await loadJournal();
       } catch (err) {
         alert(err.message);
@@ -1063,6 +1120,15 @@
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("작업일지", { views: [{ showGridLines: false }] });
     ws.columns = [{ width: 11.5 }, { width: 18 }, { width: 30 }, { width: 13 }];
+    ws.pageSetup = {
+      paperSize: 9, // A4
+      orientation: "portrait",
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 1,
+      horizontalCentered: true,
+      margins: { left: 0.35, right: 0.35, top: 0.35, bottom: 0.3, header: 0.5, footer: 0.5 },
+    };
     const byDate = groupJournalByDate(rows);
 
     let r = 1;
@@ -1189,6 +1255,8 @@
     xlsStyleCell(ws.getCell(r, 4), { size: 11, align: "left", border: xlsAllThin() });
     ws.getRow(r).height = 30;
 
+    ws.pageSetup.printArea = `A1:D${r}`;
+
     return wb;
   }
 
@@ -1197,6 +1265,15 @@
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("작업일지", { views: [{ showGridLines: false }] });
     ws.columns = [{ width: 10.5 }, { width: 6.5 }, { width: 16.5 }, { width: 27 }, { width: 22.5 }];
+    ws.pageSetup = {
+      paperSize: 9, // A4
+      orientation: "portrait",
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 1,
+      horizontalCentered: true,
+      margins: { left: 0.3, right: 0.3, top: 0.35, bottom: 0.3, header: 0.1, footer: 0.1 },
+    };
     const byDate = groupJournalByDate(rows);
 
     const days = [];
@@ -1330,6 +1407,8 @@
     xlsStyleCell(ws.getCell(r, 4), { size: 11, align: "left", border: { top: XLS_THIN, bottom: XLS_MED, left: XLS_THIN, right: XLS_MED } });
     ws.getRow(r).height = 36;
 
+    ws.pageSetup.printArea = `A1:E${r}`;
+
     return wb;
   }
 
@@ -1377,6 +1456,337 @@
       await xlsDownloadBlob(wb, `월간시설작업일지_${month}.xlsx`);
     } catch (err) {
       exportError.textContent = err.message;
+    }
+  });
+
+  // ================= 경리 업무일지 (No / 현장 / 업무 / 마감기한 / 완료) =================
+
+  async function loadAccounting() {
+    const params = new URLSearchParams({ sort: "desc" });
+    if (accountingFilterSite.value) params.set("site", accountingFilterSite.value);
+    if (accountingFilterDate.value) params.set("date", accountingFilterDate.value);
+    if (accountingFilterDone.value !== "") params.set("done", accountingFilterDone.value);
+    const data = await api(`/api/accounting?${params.toString()}`);
+    accountingEntries = data.entries;
+    renderAccounting();
+  }
+
+  accountingFilterSite.addEventListener("change", loadAccounting);
+  accountingFilterDate.addEventListener("change", loadAccounting);
+  accountingFilterDone.addEventListener("change", loadAccounting);
+  accountingFilterResetBtn.addEventListener("click", () => {
+    accountingFilterSite.value = "";
+    accountingFilterDate.value = "";
+    accountingFilterDone.value = "";
+    loadAccounting();
+  });
+
+  addAccountingBtn.addEventListener("click", () => {
+    accountingAddError.textContent = "";
+    accountingAddForm.classList.toggle("hidden");
+    if (!accountingAddForm.classList.contains("hidden") && !newAccountingDate.value) {
+      newAccountingDate.value = todayStr();
+    }
+  });
+  cancelAccountingBtn.addEventListener("click", () => {
+    accountingAddForm.classList.add("hidden");
+    resetAccountingAddForm();
+  });
+
+  function resetAccountingAddForm() {
+    newAccountingDate.value = todayStr();
+    newAccountingSite.value = "";
+    newAccountingContent.value = "";
+    newAccountingDue.value = "";
+    newAccountingDone.checked = false;
+    accountingAddError.textContent = "";
+  }
+
+  saveAccountingBtn.addEventListener("click", async () => {
+    accountingAddError.textContent = "";
+    if (!newAccountingSite.value) { accountingAddError.textContent = "현장을 선택해주세요."; return; }
+    if (!newAccountingDate.value) { accountingAddError.textContent = "작업 날짜를 선택해주세요."; return; }
+    if (!newAccountingContent.value.trim()) { accountingAddError.textContent = "업무 내용을 입력해주세요."; return; }
+    try {
+      await api("/api/accounting", {
+        method: "POST",
+        body: JSON.stringify({
+          work_date: newAccountingDate.value,
+          site_name: newAccountingSite.value,
+          content: newAccountingContent.value,
+          due_date: newAccountingDue.value || null,
+          done: newAccountingDone.checked,
+        }),
+      });
+      accountingAddForm.classList.add("hidden");
+      resetAccountingAddForm();
+      await loadAccounting();
+    } catch (err) {
+      accountingAddError.textContent = err.message;
+    }
+  });
+
+  function renderAccounting() {
+    if (accountingEntries.length === 0) {
+      accountingBody.innerHTML = "";
+      accountingEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    accountingEmptyMsg.classList.add("hidden");
+    accountingBody.innerHTML = accountingEntries
+      .map((r) => (editingAccountingId === r.id ? accountingEditRowHtml(r) : accountingViewRowHtml(r)))
+      .join("");
+  }
+
+  function accountingViewRowHtml(r) {
+    return `
+      <tr class="${r.done ? "paid-row" : ""}" data-id="${r.id}">
+        <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+        <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
+        <td class="content-cell-wide" data-label="업무"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
+        <td class="col-date" data-label="마감기한"><span class="cell-value">${escapeHtml(r.due_date) || "-"}</span></td>
+        <td class="col-check" data-label="완료">
+          <input type="checkbox" data-action="toggle-accounting-done" data-id="${r.id}" ${r.done ? "checked" : ""} />
+        </td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-ghost btn-sm" data-action="edit-accounting" data-id="${r.id}">수정</button>
+            <button class="btn btn-danger btn-sm" data-action="delete-accounting" data-id="${r.id}">삭제</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  function accountingEditRowHtml(r) {
+    const siteOpts = sites
+      .map((s) => `<option value="${escapeHtml(s.name)}" ${s.name === r.site_name ? "selected" : ""}>${escapeHtml(s.name)}</option>`)
+      .join("");
+    return `
+      <tr data-id="${r.id}">
+        <td class="col-date" data-label="작업일"><input class="edit-input" type="date" data-edit="work_date" value="${r.work_date || ""}" /></td>
+        <td data-label="현장명"><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
+        <td data-label="업무"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
+        <td class="col-date" data-label="마감기한"><input class="edit-input" type="date" data-edit="due_date" value="${r.due_date || ""}" /></td>
+        <td class="col-check" data-label="완료">
+          <input type="checkbox" data-edit="done" ${r.done ? "checked" : ""} />
+        </td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-primary btn-sm" data-action="save-edit-accounting" data-id="${r.id}">저장</button>
+            <button class="btn btn-ghost btn-sm" data-action="cancel-edit-accounting" data-id="${r.id}">취소</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  accountingBody.addEventListener("click", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (!action || !id) return;
+
+    if (action === "edit-accounting") {
+      editingAccountingId = Number(id);
+      renderAccounting();
+    } else if (action === "cancel-edit-accounting") {
+      editingAccountingId = null;
+      renderAccounting();
+    } else if (action === "save-edit-accounting") {
+      const row = e.target.closest("tr");
+      const patch = {
+        work_date: row.querySelector('[data-edit="work_date"]').value || null,
+        site_name: row.querySelector('[data-edit="site_name"]').value,
+        content: row.querySelector('[data-edit="content"]').value,
+        due_date: row.querySelector('[data-edit="due_date"]').value || null,
+        done: row.querySelector('[data-edit="done"]').checked,
+      };
+      try {
+        await api(`/api/accounting/${id}`, { method: "PUT", body: JSON.stringify(patch) });
+        editingAccountingId = null;
+        await loadAccounting();
+      } catch (err) {
+        alert(err.message);
+      }
+    } else if (action === "delete-accounting") {
+      if (!confirm("이 경리 업무일지를 삭제할까요?")) return;
+      try {
+        await api(`/api/accounting/${id}`, { method: "DELETE" });
+        await loadAccounting();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  accountingBody.addEventListener("change", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (action === "toggle-accounting-done" && id) {
+      try {
+        await api(`/api/accounting/${id}`, { method: "PUT", body: JSON.stringify({ done: e.target.checked }) });
+        await loadAccounting();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  // ---- 경리 업무일지 엑셀 다운로드 (회사 공식 "일일 업무 일지" 양식 그대로 재현) ----
+
+  function accountingWeekOfMonth(dateStr) {
+    // 그 달의 첫 번째 월요일을 1주차의 시작으로 보고, 그 이전 며칠(월초 주말 등)은 1주차에 포함합니다.
+    const d = new Date(`${dateStr}T00:00:00Z`);
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth() + 1;
+    const day = d.getUTCDate();
+    const first = new Date(Date.UTC(year, month - 1, 1));
+    const firstDow = first.getUTCDay(); // 0=일 ... 6=토
+    const daysUntilFirstMonday = (8 - firstDow) % 7;
+    const firstMonday = 1 + daysUntilFirstMonday;
+    const week = day < firstMonday ? 1 : Math.floor((day - firstMonday) / 7) + 1;
+    return { month, week };
+  }
+
+  function estimateAccountingRowHeight(content, charsPerLine) {
+    // 엑셀 서식의 "자동 줄 높이"를 흉내내기 위한 근사치 계산입니다 (완전히 동일하지는 않음).
+    const lines = String(content || "").split("\n");
+    let totalLines = 0;
+    lines.forEach((line) => {
+      totalLines += Math.max(1, Math.ceil((line.length || 1) / charsPerLine));
+    });
+    return Math.max(40, totalLines * 18 + 10);
+  }
+
+  async function buildAccountingWorkbook(dateStr, entries, followupItems) {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("일일업무일지", { views: [{ showGridLines: false }] });
+    ws.columns = [{ width: 6 }, { width: 13.5 }, { width: 62.66 }, { width: 12.08 }, { width: 8 }];
+    ws.pageSetup = {
+      paperSize: 9, // A4
+      orientation: "portrait",
+      horizontalCentered: true,
+      margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.5, footer: 0.5 },
+    };
+
+    const { month, week } = accountingWeekOfMonth(dateStr);
+    const dateObj = new Date(`${dateStr}T00:00:00Z`);
+
+    let r = 1;
+    ws.mergeCells(r, 1, r, 5);
+    ws.getCell(r, 1).value = "일일 업무 일지";
+    xlsStyleCell(ws.getCell(r, 1), { size: 18, bold: true, color: "FF000000", fill: "FFE6F7FE", align: "center", wrap: true });
+    ws.getRow(r).height = 36;
+    r++;
+
+    ws.mergeCells(r, 1, r, 5);
+    xlsStyleCell(ws.getCell(r, 1), { size: 11, fill: "FFFFFFFF", align: "center" });
+    ws.getRow(r).height = 28;
+    r++;
+
+    ws.mergeCells(r, 1, r, 5);
+    ws.getCell(r, 1).value = `${month}월 ${week}주차`;
+    xlsStyleCell(ws.getCell(r, 1), {
+      size: 12, bold: true, color: "FFFFFFFF", fill: "FF042C68", align: "center", wrap: true,
+      border: { bottom: XLS_THIN },
+    });
+    ws.getRow(r).height = 26;
+    r++;
+
+    ws.mergeCells(r, 1, r, 5);
+    const dateCell = ws.getCell(r, 1);
+    dateCell.value = dateObj;
+    dateCell.numFmt = "mm-dd-yy";
+    xlsStyleCell(dateCell, { size: 12, bold: true, color: "FF000000", fill: "FFFFFFEB", align: "center", wrap: true, border: xlsAllThin() });
+    ws.getRow(r).height = 24;
+    r++;
+
+    const headers = ["No.", "현장", "업무", "마감기한", "완료"];
+    headers.forEach((h, i) => {
+      const c = ws.getCell(r, i + 1);
+      c.value = h;
+      xlsStyleCell(c, { size: 12, bold: true, color: "FF000000", fill: "FFE6F7FE", align: "center", wrap: true, border: xlsAllThin() });
+    });
+    ws.getRow(r).height = 24;
+    r++;
+
+    const rowCount = Math.max(10, entries.length);
+    for (let i = 0; i < rowCount; i++) {
+      const e = entries[i];
+
+      const noCell = ws.getCell(r, 1);
+      noCell.value = i + 1;
+      xlsStyleCell(noCell, { size: 11, bold: true, color: "FF000000", align: "center", border: xlsAllThin() });
+
+      const siteCell = ws.getCell(r, 2);
+      siteCell.value = e ? e.site_name : "";
+      xlsStyleCell(siteCell, { size: 11, align: "left", wrap: true, border: xlsAllThin() });
+
+      const contentCell = ws.getCell(r, 3);
+      contentCell.value = e ? e.content : "";
+      xlsStyleCell(contentCell, { size: 11, align: "left", wrap: true, border: xlsAllThin() });
+
+      const dueCell = ws.getCell(r, 4);
+      if (e && e.due_date) {
+        dueCell.value = new Date(`${e.due_date}T00:00:00Z`);
+        dueCell.numFmt = "mm-dd-yy";
+      }
+      xlsStyleCell(dueCell, { size: 11, align: "center", wrap: true, border: xlsAllThin() });
+
+      const doneCell = ws.getCell(r, 5);
+      doneCell.value = e ? (e.done ? "O" : "-") : "";
+      xlsStyleCell(doneCell, { size: 11, align: "center", wrap: true, border: xlsAllThin() });
+
+      ws.getRow(r).height = e ? estimateAccountingRowHeight(e.content, 40) : 40;
+      r++;
+    }
+
+    ws.mergeCells(r, 1, r, 5);
+    ws.getCell(r, 1).value = "진행 필요한 후속 업무";
+    xlsStyleCell(ws.getCell(r, 1), {
+      size: 12, bold: true, color: "FF000000", fill: "FFE6F7FE", align: "center", wrap: true,
+      border: { top: XLS_THIN, bottom: XLS_THIN },
+    });
+    ws.getRow(r).height = 26;
+    r++;
+
+    for (let i = 0; i < followupItems.length; i++) {
+      const f = followupItems[i];
+
+      const noCell = ws.getCell(r, 1);
+      noCell.value = i + 1;
+      xlsStyleCell(noCell, { size: 11, bold: true, color: "FF000000", fill: "FFFFFFCC", align: "center", wrap: true, border: xlsAllThin() });
+
+      const siteCell = ws.getCell(r, 2);
+      siteCell.value = f.site_name;
+      xlsStyleCell(siteCell, { size: 11, fill: "FFFFFFCC", align: "left", wrap: true, border: xlsAllThin() });
+
+      ws.mergeCells(r, 3, r, 5);
+      const contentCell = ws.getCell(r, 3);
+      contentCell.value = f.content;
+      xlsStyleCell(contentCell, { size: 11, fill: "FFFFFFCC", align: "left", wrap: true, border: xlsAllThin() });
+
+      ws.getRow(r).height = estimateAccountingRowHeight(f.content, 52);
+      r++;
+    }
+
+    return wb;
+  }
+
+  downloadAccountingBtn.addEventListener("click", async () => {
+    accountingExportError.textContent = "";
+    if (typeof ExcelJS === "undefined") {
+      accountingExportError.textContent = "엑셀 생성 라이브러리를 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.";
+      return;
+    }
+    const date = accountingDayPicker.value;
+    if (!date) { accountingExportError.textContent = "다운로드할 날짜를 선택해주세요."; return; }
+    try {
+      const params = new URLSearchParams({ date, sort: "asc" });
+      const data = await api(`/api/accounting?${params.toString()}`);
+      const followupData = await api(`/api/followups?status=0`);
+      const wb = await buildAccountingWorkbook(date, data.entries || [], followupData.followups || []);
+      await xlsDownloadBlob(wb, `일일업무일지_${date}.xlsx`);
+    } catch (err) {
+      accountingExportError.textContent = err.message;
     }
   });
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-<title>비엠에스코리아 부산지사 | 현장 청구/입금 체크</title>
+<title>비엠에스코리아 부산지사 | 작업내역/업무일지</title>
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -12,7 +12,7 @@
   <div id="loginView" class="login-wrap">
     <form id="loginForm" class="login-box">
       <h1>비엠에스코리아 부산지사</h1>
-      <p class="login-app-name">현장 청구/입금 체크</p>
+      <p class="login-app-name">작업내역/업무일지</p>
       <p class="login-sub">비밀번호를 입력하고 접속하세요</p>
       <input id="loginPassword" type="password" placeholder="비밀번호" autocomplete="current-password" required />
       <button type="submit">로그인</button>
@@ -25,7 +25,7 @@
     <header class="app-header">
       <div class="brand">
         <div class="brand-company">비엠에스코리아 부산지사</div>
-        <div class="brand-app">현장 청구/입금 체크</div>
+        <div class="brand-app">작업내역/업무일지</div>
       </div>
       <div class="header-actions">
         <span id="lastSync" class="last-sync"></span>
@@ -40,6 +40,7 @@
       <button class="tab-btn" data-tab="저수조청소">저수조 청소</button>
       <button class="tab-btn" data-tab="history">히스토리</button>
       <button class="tab-btn" data-tab="journal">시설 업무일지</button>
+      <button class="tab-btn" data-tab="accounting">경리 업무일지</button>
       <button class="tab-btn" data-tab="followup">후속 작업</button>
       <button class="tab-btn" data-tab="overview">작업 내역 및 시설 업무일지 조회</button>
     </nav>
@@ -173,6 +174,11 @@
           <select id="journalFilterMonth">
             <option value="">전체 기간</option>
           </select>
+          <select id="journalFilterDone">
+            <option value="">전체 상태</option>
+            <option value="0">미완료</option>
+            <option value="1">완료</option>
+          </select>
           <button id="journalFilterResetBtn" class="btn btn-ghost">초기화</button>
         </div>
         <button id="addJournalBtn" class="btn btn-primary">+ 새 일지 추가</button>
@@ -218,12 +224,79 @@
               <th class="col-site">현장명</th>
               <th class="col-content-wide">작업내역</th>
               <th class="col-remarks">비고</th>
+              <th class="col-check">완료</th>
               <th class="col-manage">관리</th>
             </tr>
           </thead>
           <tbody id="journalBody"></tbody>
         </table>
         <p id="journalEmptyMsg" class="empty-msg hidden">등록된 업무일지가 없습니다.</p>
+      </section>
+    </div>
+
+    <!-- 경리 업무일지 화면 (No / 현장 / 업무 / 마감기한 / 완료) -->
+    <div id="accountingSection" class="hidden">
+      <section class="toolbar">
+        <div class="filters">
+          <select id="accountingFilterSite">
+            <option value="">전체 현장</option>
+          </select>
+          <input id="accountingFilterDate" type="date" title="특정 날짜만 보기" />
+          <select id="accountingFilterDone">
+            <option value="">전체 상태</option>
+            <option value="0">미완료</option>
+            <option value="1">완료</option>
+          </select>
+          <button id="accountingFilterResetBtn" class="btn btn-ghost">초기화</button>
+        </div>
+        <button id="addAccountingBtn" class="btn btn-primary">+ 새 업무 추가</button>
+      </section>
+
+      <section id="accountingAddForm" class="add-form hidden">
+        <div class="add-form-grid">
+          <label class="field-label">작업 날짜
+            <input id="newAccountingDate" type="date" required />
+          </label>
+          <select id="newAccountingSite" required>
+            <option value="">현장 선택</option>
+          </select>
+          <input id="newAccountingContent" type="text" placeholder="업무 내용 입력" />
+          <label class="field-label">마감기한 (선택)
+            <input id="newAccountingDue" type="date" />
+          </label>
+          <label class="chk"><input id="newAccountingDone" type="checkbox" /> 완료</label>
+        </div>
+        <div class="add-form-actions">
+          <button id="saveAccountingBtn" class="btn btn-primary">저장</button>
+          <button id="cancelAccountingBtn" class="btn btn-ghost">취소</button>
+        </div>
+        <p id="accountingAddError" class="error-msg"></p>
+      </section>
+
+      <section class="export-bar">
+        <div class="export-group">
+          <span class="export-label">경리 업무일지 다운로드</span>
+          <input id="accountingDayPicker" type="date" />
+          <button id="downloadAccountingBtn" class="btn btn-ghost">엑셀 다운로드</button>
+        </div>
+        <p id="accountingExportError" class="error-msg"></p>
+      </section>
+
+      <section class="table-wrap">
+        <table id="accountingTable">
+          <thead>
+            <tr>
+              <th class="col-date">작업일</th>
+              <th class="col-site">현장명</th>
+              <th class="col-content-wide">업무</th>
+              <th class="col-date">마감기한</th>
+              <th class="col-check">완료</th>
+              <th class="col-manage">관리</th>
+            </tr>
+          </thead>
+          <tbody id="accountingBody"></tbody>
+        </table>
+        <p id="accountingEmptyMsg" class="empty-msg hidden">등록된 경리 업무일지가 없습니다.</p>
       </section>
     </div>
 
