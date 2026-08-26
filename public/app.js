@@ -202,7 +202,8 @@
   let overviewSearchResults = [];
   let overviewMode = "month"; // "month" | "year"
   let overviewExpandedPeriods = new Set();
-  let overviewSearching = false;
+  // 기본값을 true로 두어, 탭을 열면 "검색" 버튼을 누르지 않아도 바로 전체 내역 목록이 보이게 합니다.
+  let overviewSearching = true;
   let overviewDrilldownMonth = ""; // 월별 집계에서 현장별 상세를 눌러 들어왔을 때의 월(YYYY-MM)
 
   const won = (n) => (Number(n) || 0).toLocaleString("ko-KR") + "원";
@@ -869,6 +870,8 @@
     if (journalFilterDone.value !== "") params.set("done", journalFilterDone.value);
     const data = await api(`/api/journal?${params.toString()}`);
     journalEntries = data.entries;
+    // 새 업무를 추가해도 항상 현장명 가나다순으로 보이도록 정렬합니다.
+    journalEntries.sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
     rebuildJournalMonthFilterOptions();
     renderJournal();
   }
@@ -1505,6 +1508,8 @@
     if (accountingFilterDone.value !== "") params.set("done", accountingFilterDone.value);
     const data = await api(`/api/accounting?${params.toString()}`);
     accountingEntries = data.entries;
+    // 새 업무를 추가해도 항상 현장명 가나다순으로 보이도록 정렬합니다.
+    accountingEntries.sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
     renderAccounting();
   }
 
@@ -2289,13 +2294,15 @@
     renderOverviewSummary();
   }
 
-  function switchOverviewMode(mode) {
+  // "월별/연도별" 버튼은 화면을 명시적으로 집계 표로 전환합니다(기본 화면은 전체 목록입니다).
+  async function switchOverviewMode(mode) {
     overviewMode = mode;
     overviewModeMonthBtn.classList.toggle("subtab-active", mode === "month");
     overviewModeYearBtn.classList.toggle("subtab-active", mode === "year");
     overviewPeriodHeader.textContent = mode === "month" ? "월" : "연도";
     overviewExpandedPeriods.clear();
-    renderOverviewSummary();
+    overviewSearching = false;
+    await loadOverviewSummary();
   }
   overviewModeMonthBtn.addEventListener("click", () => switchOverviewMode("month"));
   overviewModeYearBtn.addEventListener("click", () => switchOverviewMode("year"));
@@ -2540,14 +2547,15 @@
     }
   });
   overviewSearchResetBtn.addEventListener("click", async () => {
-    overviewSearching = false;
+    // 초기화하면 필터만 지우고, 기본 화면인 "전체 목록"으로 돌아갑니다.
+    overviewSearching = true;
     overviewDrilldownMonth = "";
     overviewSearchInput.value = "";
     overviewFilterSite.value = "";
     overviewFilterType.value = "all";
     overviewSearchHint.classList.add("hidden");
     overviewExpandedPeriods.clear();
-    await loadOverviewSummary();
+    await runOverviewSearch({ month: "" });
   });
 
   function escapeHtml(str) {
