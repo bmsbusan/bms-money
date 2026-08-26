@@ -394,7 +394,12 @@
         <p id="followupAddError" class="error-msg"></p>
       </section>
 
-      <section class="table-wrap">
+      <nav class="subtab-bar">
+        <button id="followupViewListBtn" class="subtab-btn subtab-active" data-view="list">목록 보기</button>
+        <button id="followupViewCalendarBtn" class="subtab-btn" data-view="calendar">달력 보기</button>
+      </nav>
+
+      <section id="followupListView" class="table-wrap">
         <table id="followupTable">
           <thead>
             <tr>
@@ -410,6 +415,40 @@
           <tbody id="followupBody"></tbody>
         </table>
         <p id="followupEmptyMsg" class="empty-msg hidden">등록된 후속 작업이 없습니다.</p>
+      </section>
+
+      <section id="followupCalendarView" class="calendar-view hidden">
+        <div class="calendar-header">
+          <button id="followupCalPrevBtn" class="btn btn-ghost btn-sm" type="button">◀</button>
+          <h3 id="followupCalTitle"></h3>
+          <button id="followupCalNextBtn" class="btn btn-ghost btn-sm" type="button">▶</button>
+          <button id="followupCalTodayBtn" class="btn btn-ghost btn-sm" type="button">오늘</button>
+        </div>
+
+        <div id="followupCalNoDueWrap" class="cal-nodue hidden">
+          <span class="cal-nodue-label">예정일 미정</span>
+          <div id="followupCalNoDueList" class="cal-nodue-list"></div>
+        </div>
+
+        <div class="calendar-grid cal-weekday-row">
+          <div class="cal-weekday cal-sun">일</div>
+          <div class="cal-weekday">월</div>
+          <div class="cal-weekday">화</div>
+          <div class="cal-weekday">수</div>
+          <div class="cal-weekday">목</div>
+          <div class="cal-weekday">금</div>
+          <div class="cal-weekday cal-sat">토</div>
+        </div>
+        <div class="calendar-grid" id="followupCalDays"></div>
+
+        <section id="followupCalDetail" class="cal-detail hidden">
+          <div class="cal-detail-header">
+            <h4 id="followupCalDetailTitle"></h4>
+            <button id="followupCalAddForDateBtn" class="btn btn-primary btn-sm" type="button">+ 이 날짜에 추가</button>
+          </div>
+          <div id="followupCalDetailList"></div>
+          <p id="followupCalDetailEmpty" class="empty-msg hidden">이 날짜에 등록된 후속 작업이 없습니다.</p>
+        </section>
       </section>
     </div>
 

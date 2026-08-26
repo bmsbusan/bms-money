@@ -148,6 +148,22 @@
   const followupAddError = $("#followupAddError");
   const followupBody = $("#followupBody");
   const followupEmptyMsg = $("#followupEmptyMsg");
+  const followupViewListBtn = $("#followupViewListBtn");
+  const followupViewCalendarBtn = $("#followupViewCalendarBtn");
+  const followupListView = $("#followupListView");
+  const followupCalendarView = $("#followupCalendarView");
+  const followupCalPrevBtn = $("#followupCalPrevBtn");
+  const followupCalNextBtn = $("#followupCalNextBtn");
+  const followupCalTodayBtn = $("#followupCalTodayBtn");
+  const followupCalTitle = $("#followupCalTitle");
+  const followupCalDays = $("#followupCalDays");
+  const followupCalNoDueWrap = $("#followupCalNoDueWrap");
+  const followupCalNoDueList = $("#followupCalNoDueList");
+  const followupCalDetail = $("#followupCalDetail");
+  const followupCalDetailTitle = $("#followupCalDetailTitle");
+  const followupCalAddForDateBtn = $("#followupCalAddForDateBtn");
+  const followupCalDetailList = $("#followupCalDetailList");
+  const followupCalDetailEmpty = $("#followupCalDetailEmpty");
 
   // ---------- 작업내역 조회 화면 요소 ----------
   const overviewSection = $("#overviewSection");
@@ -190,12 +206,17 @@
   let acctOverviewSearchResults = [];
   let acctOverviewMode = "month"; // "month" | "year"
   let acctOverviewExpandedPeriods = new Set();
-  let acctOverviewSearching = false;
+  // 기본 화면은 "전체 목록"입니다(월별/연간 집계는 "월별"/"연도별" 버튼을 눌렀을 때만 보여줍니다).
+  let acctOverviewSearching = true;
   let acctOverviewDrilldownMonth = ""; // 월별 집계에서 현장별 상세를 눌러 들어왔을 때의 월(YYYY-MM)
 
   // 후속 작업 상태
   let followupEntries = [];
   let editingFollowupId = null;
+  let followupView = "list"; // "list" | "calendar"
+  let followupCalYear = new Date().getFullYear();
+  let followupCalMonth = new Date().getMonth() + 1; // 1~12
+  let followupCalSelectedDate = null; // "YYYY-MM-DD" | null
 
   // 작업내역 조회 상태
   let overviewSummaryRows = [];
@@ -1886,13 +1907,15 @@
     renderAcctOverviewSummary();
   }
 
-  function switchAcctOverviewMode(mode) {
+  async function switchAcctOverviewMode(mode) {
     acctOverviewMode = mode;
     acctOverviewModeMonthBtn.classList.toggle("subtab-active", mode === "month");
     acctOverviewModeYearBtn.classList.toggle("subtab-active", mode === "year");
     acctOverviewPeriodHeader.textContent = mode === "month" ? "월" : "연도";
     acctOverviewExpandedPeriods.clear();
-    renderAcctOverviewSummary();
+    // "월별"/"연도별" 버튼은 화면을 명시적으로 집계 표로 전환합니다(기본 화면은 전체 목록입니다).
+    acctOverviewSearching = false;
+    await loadAcctOverviewSummary();
   }
   acctOverviewModeMonthBtn.addEventListener("click", () => switchAcctOverviewMode("month"));
   acctOverviewModeYearBtn.addEventListener("click", () => switchAcctOverviewMode("year"));
@@ -2083,14 +2106,15 @@
     }
   });
   acctOverviewSearchResetBtn.addEventListener("click", async () => {
-    acctOverviewSearching = false;
+    // 초기화하면 필터만 지우고, 기본 화면인 "전체 목록"으로 돌아갑니다.
+    acctOverviewSearching = true;
     acctOverviewDrilldownMonth = "";
     acctOverviewSearchInput.value = "";
     acctOverviewFilterSite.value = "";
     acctOverviewFilterDone.value = "";
     acctOverviewSearchHint.classList.add("hidden");
     acctOverviewExpandedPeriods.clear();
-    await loadAcctOverviewSummary();
+    await runAcctOverviewSearch({ month: "" });
   });
 
   // ================= 후속 작업 (앞으로 진행해야 하는 업무 등록/조회) =================
@@ -2103,7 +2127,11 @@
     followupEntries = data.followups;
     // 현장명 가나다순으로 정렬(같은 현장 안에서는 서버가 내려준 순서(완료여부/예정일 등)를 그대로 유지)
     followupEntries.sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
-    renderFollowups();
+    if (followupView === "calendar") {
+      renderFollowupCalendar();
+    } else {
+      renderFollowups();
+    }
   }
 
   followupFilterSite.addEventListener("change", loadFollowups);
@@ -2264,6 +2292,175 @@
         alert(err.message);
       }
     }
+  });
+
+  // ---- 후속 작업: 목록 보기 / 달력 보기 전환 ----
+  function switchFollowupView(view) {
+    followupView = view;
+    followupViewListBtn.classList.toggle("subtab-active", view === "list");
+    followupViewCalendarBtn.classList.toggle("subtab-active", view === "calendar");
+    followupListView.classList.toggle("hidden", view !== "list");
+    followupCalendarView.classList.toggle("hidden", view !== "calendar");
+    if (view === "calendar") renderFollowupCalendar();
+  }
+  followupViewListBtn.addEventListener("click", () => switchFollowupView("list"));
+  followupViewCalendarBtn.addEventListener("click", () => switchFollowupView("calendar"));
+
+  // ---- 후속 작업: 달력 보기 ----
+  followupCalPrevBtn.addEventListener("click", () => {
+    followupCalMonth -= 1;
+    if (followupCalMonth < 1) { followupCalMonth = 12; followupCalYear -= 1; }
+    renderFollowupCalendar();
+  });
+  followupCalNextBtn.addEventListener("click", () => {
+    followupCalMonth += 1;
+    if (followupCalMonth > 12) { followupCalMonth = 1; followupCalYear += 1; }
+    renderFollowupCalendar();
+  });
+  followupCalTodayBtn.addEventListener("click", () => {
+    const t = new Date();
+    followupCalYear = t.getFullYear();
+    followupCalMonth = t.getMonth() + 1;
+    followupCalSelectedDate = todayStr();
+    renderFollowupCalendar();
+  });
+
+  function groupFollowupsByDate(entries) {
+    const map = new Map();
+    entries.forEach((r) => {
+      if (!r.due_date) return;
+      if (!map.has(r.due_date)) map.set(r.due_date, []);
+      map.get(r.due_date).push(r);
+    });
+    return map;
+  }
+
+  function followupCalChipHtml(r) {
+    const cls = r.status ? "cal-chip-done" : isOverdue(r) ? "cal-chip-overdue" : "";
+    const label = `${r.site_name}${r.content ? " · " + r.content : ""}`;
+    return `<div class="cal-chip ${cls}" title="${escapeHtml(label)}">${escapeHtml(r.site_name)}</div>`;
+  }
+
+  function renderFollowupCalendar() {
+    followupCalTitle.textContent = `${followupCalYear}년 ${followupCalMonth}월`;
+
+    const byDate = groupFollowupsByDate(followupEntries);
+    const noDue = followupEntries.filter((r) => !r.due_date);
+    if (noDue.length === 0) {
+      followupCalNoDueWrap.classList.add("hidden");
+      followupCalNoDueList.innerHTML = "";
+    } else {
+      followupCalNoDueWrap.classList.remove("hidden");
+      followupCalNoDueList.innerHTML = noDue.map(followupCalChipHtml).join("");
+    }
+
+    // 이번 달 앞뒤로 달력 6주(42칸)를 채웁니다(월요일 시작이 아니라 일요일 시작 표준 달력).
+    const daysInMonth = new Date(Date.UTC(followupCalYear, followupCalMonth, 0)).getUTCDate();
+    const firstDow = new Date(Date.UTC(followupCalYear, followupCalMonth - 1, 1)).getUTCDay(); // 0=일
+    const cells = [];
+    for (let i = 0; i < firstDow; i++) cells.push(null); // 이전 달 자리는 빈 칸으로 둡니다.
+    for (let d = 1; d <= daysInMonth; d++) cells.push({ y: followupCalYear, m: followupCalMonth, d });
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    const today = todayStr();
+    const maxShow = 3;
+    followupCalDays.innerHTML = cells
+      .map((c, idx) => {
+        if (!c) return `<div class="cal-day cal-day-outside" style="cursor:default"></div>`;
+        const key = `${c.y}-${String(c.m).padStart(2, "0")}-${String(c.d).padStart(2, "0")}`;
+        const dow = idx % 7;
+        const items = byDate.get(key) || [];
+        const shown = items.slice(0, maxShow);
+        const moreCount = items.length - shown.length;
+        const chips = shown.map(followupCalChipHtml).join("");
+        const moreHtml = moreCount > 0 ? `<div class="cal-day-more">+${moreCount}건 더</div>` : "";
+        const classes = [
+          "cal-day",
+          key === today ? "cal-day-today" : "",
+          key === followupCalSelectedDate ? "cal-day-selected" : "",
+          dow === 0 ? "cal-day-sun" : dow === 6 ? "cal-day-sat" : "",
+        ].filter(Boolean).join(" ");
+        return `<div class="${classes}" data-date="${key}"><div class="cal-day-num">${c.d}</div>${chips}${moreHtml}</div>`;
+      })
+      .join("");
+
+    renderFollowupCalDetail();
+  }
+
+  followupCalDays.addEventListener("click", (e) => {
+    const cell = e.target.closest(".cal-day[data-date]");
+    if (!cell) return;
+    followupCalSelectedDate = cell.getAttribute("data-date");
+    renderFollowupCalendar();
+  });
+
+  function renderFollowupCalDetail() {
+    if (!followupCalSelectedDate) {
+      followupCalDetail.classList.add("hidden");
+      return;
+    }
+    followupCalDetail.classList.remove("hidden");
+    const [y, m, d] = followupCalSelectedDate.split("-").map(Number);
+    followupCalDetailTitle.textContent = `${y}년 ${m}월 ${d}일 후속 작업`;
+    const items = followupEntries.filter((r) => r.due_date === followupCalSelectedDate);
+    if (items.length === 0) {
+      followupCalDetailList.innerHTML = "";
+      followupCalDetailEmpty.classList.remove("hidden");
+    } else {
+      followupCalDetailEmpty.classList.add("hidden");
+      followupCalDetailList.innerHTML = items
+        .map((r) => `
+          <div class="cal-detail-item" data-id="${r.id}">
+            <input type="checkbox" data-action="toggle-followup-status" data-id="${r.id}" ${r.status ? "checked" : ""} />
+            <span class="cal-detail-site">${escapeHtml(r.site_name)}</span>
+            <span class="cal-detail-content">${escapeHtml(r.content) || "-"}</span>
+            <span class="cal-detail-remarks">${escapeHtml(r.remarks) || ""}</span>
+            <span class="row-actions">
+              <button class="btn btn-ghost btn-sm" data-action="edit-followup-from-cal" data-id="${r.id}">수정</button>
+              <button class="btn btn-danger btn-sm" data-action="delete-followup" data-id="${r.id}">삭제</button>
+            </span>
+          </div>`)
+        .join("");
+    }
+  }
+
+  followupCalDetailList.addEventListener("change", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (action === "toggle-followup-status" && id) {
+      try {
+        await api(`/api/followups/${id}`, { method: "PUT", body: JSON.stringify({ status: e.target.checked }) });
+        await loadFollowups();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  followupCalDetailList.addEventListener("click", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (!action || !id) return;
+    if (action === "edit-followup-from-cal") {
+      editingFollowupId = Number(id);
+      switchFollowupView("list");
+      renderFollowups();
+    } else if (action === "delete-followup") {
+      if (!confirm("이 후속 작업을 삭제할까요?")) return;
+      try {
+        await api(`/api/followups/${id}`, { method: "DELETE" });
+        await loadFollowups();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  followupCalAddForDateBtn.addEventListener("click", () => {
+    switchFollowupView("list");
+    followupAddForm.classList.remove("hidden");
+    followupAddError.textContent = "";
+    newFollowupDue.value = followupCalSelectedDate || "";
   });
 
   // ================= 작업 내역 및 시설 업무일지 조회 (월별/연간 통합 + 검색) =================
