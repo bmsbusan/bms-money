@@ -221,6 +221,7 @@
         <table id="journalTable">
           <thead>
             <tr>
+              <th class="col-no">No.</th>
               <th class="col-date">작업일</th>
               <th class="col-site">현장명</th>
               <th class="col-content-wide">작업내역</th>
@@ -280,6 +281,10 @@
           <input id="accountingDayPicker" type="date" />
           <button id="downloadAccountingBtn" class="btn btn-ghost">엑셀 다운로드</button>
         </div>
+        <div class="export-group">
+          <span class="export-label">현재 목록 텍스트로 다운로드</span>
+          <button id="downloadAccountingTxtBtn" class="btn btn-ghost">텍스트(.txt) 다운로드</button>
+        </div>
         <p id="accountingExportError" class="error-msg"></p>
       </section>
 
@@ -287,6 +292,7 @@
         <table id="accountingTable">
           <thead>
             <tr>
+              <th class="col-no">No.</th>
               <th class="col-date">작업일</th>
               <th class="col-site">현장명</th>
               <th class="col-content-wide">업무</th>

@@ -112,6 +112,7 @@
   const accountingEmptyMsg = $("#accountingEmptyMsg");
   const accountingDayPicker = $("#accountingDayPicker");
   const downloadAccountingBtn = $("#downloadAccountingBtn");
+  const downloadAccountingTxtBtn = $("#downloadAccountingTxtBtn");
   const accountingExportError = $("#accountingExportError");
 
   // ---------- 경리 업무일지 조회 화면 요소 ----------
@@ -941,13 +942,14 @@
     }
     journalEmptyMsg.classList.add("hidden");
     journalBody.innerHTML = journalEntries
-      .map((r) => (editingJournalId === r.id ? journalEditRowHtml(r) : journalViewRowHtml(r)))
+      .map((r, i) => (editingJournalId === r.id ? journalEditRowHtml(r, i) : journalViewRowHtml(r, i)))
       .join("");
   }
 
-  function journalViewRowHtml(r) {
+  function journalViewRowHtml(r, i) {
     return `
       <tr class="${r.done ? "paid-row" : ""}" data-id="${r.id}">
+        <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
         <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
         <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
         <td class="content-cell-wide" data-label="작업내역"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
@@ -964,12 +966,13 @@
       </tr>`;
   }
 
-  function journalEditRowHtml(r) {
+  function journalEditRowHtml(r, i) {
     const siteOpts = sites
       .map((s) => `<option value="${escapeHtml(s.name)}" ${s.name === r.site_name ? "selected" : ""}>${escapeHtml(s.name)}</option>`)
       .join("");
     return `
       <tr data-id="${r.id}">
+        <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
         <td class="col-date" data-label="작업일"><input class="edit-input" type="date" data-edit="work_date" value="${r.work_date || ""}" /></td>
         <td data-label="현장명"><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
         <td data-label="작업내역"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
@@ -1077,7 +1080,9 @@
   const xlsAllThin = () => ({ top: XLS_THIN, bottom: XLS_THIN, left: XLS_THIN, right: XLS_THIN });
 
   function xlsStyleCell(cell, opts) {
-    const { size = 10, bold = false, color = "FF000000", fill, align = "left", valign = "center", wrap = false, border } = opts || {};
+    // 참고: ExcelJS의 세로 정렬 값은 "center"가 아니라 "middle"입니다("center"를 넣으면
+    // 조용히 무시되어 세로 정렬이 전혀 적용되지 않습니다) — 기본값을 "middle"로 둡니다.
+    const { size = 10, bold = false, color = "FF000000", fill, align = "left", valign = "middle", wrap = false, border } = opts || {};
     cell.font = { name: XLS_FONT, size, bold, color: { argb: color } };
     cell.alignment = { horizontal: align, vertical: valign, wrapText: !!wrap };
     if (fill) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } };
@@ -1566,13 +1571,14 @@
     }
     accountingEmptyMsg.classList.add("hidden");
     accountingBody.innerHTML = accountingEntries
-      .map((r) => (editingAccountingId === r.id ? accountingEditRowHtml(r) : accountingViewRowHtml(r)))
+      .map((r, i) => (editingAccountingId === r.id ? accountingEditRowHtml(r, i) : accountingViewRowHtml(r, i)))
       .join("");
   }
 
-  function accountingViewRowHtml(r) {
+  function accountingViewRowHtml(r, i) {
     return `
       <tr class="${r.done ? "paid-row" : ""}" data-id="${r.id}">
+        <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
         <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
         <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
         <td class="content-cell-wide" data-label="업무"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
@@ -1589,12 +1595,13 @@
       </tr>`;
   }
 
-  function accountingEditRowHtml(r) {
+  function accountingEditRowHtml(r, i) {
     const siteOpts = sites
       .map((s) => `<option value="${escapeHtml(s.name)}" ${s.name === r.site_name ? "selected" : ""}>${escapeHtml(s.name)}</option>`)
       .join("");
     return `
       <tr data-id="${r.id}">
+        <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
         <td class="col-date" data-label="작업일"><input class="edit-input" type="date" data-edit="work_date" value="${r.work_date || ""}" /></td>
         <td data-label="현장명"><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
         <td data-label="업무"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
@@ -1785,16 +1792,16 @@
 
       const noCell = ws.getCell(r, 1);
       noCell.value = i + 1;
-      xlsStyleCell(noCell, { size: 11, bold: true, color: "FF000000", fill: "FFFFFFCC", align: "center", wrap: true, border: xlsAllThin() });
+      xlsStyleCell(noCell, { size: 11, bold: true, color: "FF000000", align: "center", wrap: true, border: xlsAllThin() });
 
       const siteCell = ws.getCell(r, 2);
       siteCell.value = f.site_name;
-      xlsStyleCell(siteCell, { size: 11, fill: "FFFFFFCC", align: "left", wrap: true, border: xlsAllThin() });
+      xlsStyleCell(siteCell, { size: 11, align: "left", wrap: true, border: xlsAllThin() });
 
       ws.mergeCells(r, 3, r, 5);
       const contentCell = ws.getCell(r, 3);
       contentCell.value = f.content;
-      xlsStyleCell(contentCell, { size: 11, fill: "FFFFFFCC", align: "left", wrap: true, border: xlsAllThin() });
+      xlsStyleCell(contentCell, { size: 11, align: "left", wrap: true, border: xlsAllThin() });
 
       ws.getRow(r).height = estimateAccountingRowHeight(f.content, 52);
       r++;
@@ -1815,11 +1822,42 @@
       const params = new URLSearchParams({ date, sort: "asc" });
       const data = await api(`/api/accounting?${params.toString()}`);
       const followupData = await api(`/api/followups?status=0`);
-      const wb = await buildAccountingWorkbook(date, data.entries || [], followupData.followups || []);
+      // "후속 작업" 탭과 번호가 어긋나지 않도록, 화면과 동일하게 현장명 가나다순으로 정렬합니다.
+      const followupItems = (followupData.followups || []).slice()
+        .sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
+      const wb = await buildAccountingWorkbook(date, data.entries || [], followupItems);
       await xlsDownloadBlob(wb, `일일업무일지_${date}.xlsx`);
     } catch (err) {
       accountingExportError.textContent = err.message;
     }
+  });
+
+  // 현재 화면에 표시된(필터가 적용된) 경리 업무일지 목록을 그대로
+  // "번호. 현장명 / 줄바꿈 / 업무내용" 형태의 텍스트 파일로 내보냅니다.
+  function downloadTextBlob(text, filename) {
+    // Windows 메모장 등에서 한글이 깨지지 않도록 UTF-8 BOM을 붙입니다.
+    const blob = new Blob(["﻿" + text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  downloadAccountingTxtBtn.addEventListener("click", () => {
+    accountingExportError.textContent = "";
+    if (accountingEntries.length === 0) {
+      accountingExportError.textContent = "다운로드할 목록이 없습니다.";
+      return;
+    }
+    const text = accountingEntries
+      .map((r, i) => `${i + 1}. ${r.site_name}\n${r.content || "-"}`)
+      .join("\n\n");
+    const dateLabel = accountingFilterDate.value || todayStr();
+    downloadTextBlob(text, `경리업무일지_${dateLabel}.txt`);
   });
 
   // ================= 경리 업무일지 조회 (월별/연간 통합 + 검색) =================
