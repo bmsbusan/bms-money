@@ -479,6 +479,9 @@ async function handleGetAccounting(request, env) {
   const done = url.searchParams.get("done") || "";     // "0" | "1" | ""
   const keyword = url.searchParams.get("keyword") || "";
   const sort = url.searchParams.get("sort") === "asc" ? "ASC" : "DESC";
+  // "경리 업무일지" 작성 화면에서 날짜를 특정하지 않고 볼 때만 보내는 옵션입니다.
+  // ("경리 업무일지 조회" 화면의 검색/집계는 이 옵션을 보내지 않으므로 항상 전체 기간이 그대로 조회됩니다.)
+  const hideOldDone = url.searchParams.get("hideOldDone") === "1";
 
   let query = "SELECT * FROM accounting_journal WHERE 1=1";
   const binds = [];
@@ -487,16 +490,29 @@ async function handleGetAccounting(request, env) {
     binds.push(site);
   }
   if (date) {
-    query += " AND work_date = ?";
-    binds.push(date);
-  }
-  if (from) {
-    query += " AND work_date >= ?";
-    binds.push(from);
-  }
-  if (to) {
-    query += " AND work_date <= ?";
-    binds.push(to);
+    // 특정 하루를 조회할 때는 그 날짜에 "작성된" 건뿐 아니라, 그 날짜에 작성됐다가
+    // 나중에 자동 이월된 건(carried_from = 원래 작성일)도 함께 보여줍니다.
+    // → 이월되어 work_date가 바뀐 뒤에도 "처음 작성한 날"로 계속 조회할 수 있습니다.
+    query += " AND (work_date = ? OR carried_from = ?)";
+    binds.push(date, date);
+  } else {
+    if (from) {
+      query += " AND work_date >= ?";
+      binds.push(from);
+    }
+    if (to) {
+      query += " AND work_date <= ?";
+      binds.push(to);
+    }
+    if (!from && !to && hideOldDone) {
+      // 경리 업무일지 작성 화면의 기본 목록(날짜 미지정): 어제 이전에 작성되어 이미
+      // "완료"된 건은 목록을 복잡하게 만들 뿐이므로 자동으로 숨깁니다. 미완료 건은 위
+      // rolloverAccounting()에서 이미 "오늘"로 이월되어 있으므로, 여기서 걸러지는 건
+      // 전부 "지난 날짜 + 완료" 조합뿐입니다. 특정 날짜를 선택하면(위 date 분기) 완료
+      // 여부와 상관없이 그 날의 내역을 그대로 볼 수 있고, 이월된 건도 원래 작성일로
+      // 계속 조회할 수 있습니다.
+      query += " AND NOT (done = 1 AND work_date < date('now', '+9 hours'))";
+    }
   }
   if (done === "0" || done === "1") {
     query += " AND done = ?";

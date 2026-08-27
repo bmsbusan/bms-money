@@ -110,6 +110,7 @@
   const accountingAddError = $("#accountingAddError");
   const accountingBody = $("#accountingBody");
   const accountingEmptyMsg = $("#accountingEmptyMsg");
+  const accountingListHint = $("#accountingListHint");
   const accountingDayPicker = $("#accountingDayPicker");
   const downloadAccountingBtn = $("#downloadAccountingBtn");
   const downloadAccountingTxtBtn = $("#downloadAccountingTxtBtn");
@@ -1527,11 +1528,21 @@
     if (accountingFilterSite.value) params.set("site", accountingFilterSite.value);
     if (accountingFilterDate.value) params.set("date", accountingFilterDate.value);
     if (accountingFilterDone.value !== "") params.set("done", accountingFilterDone.value);
+    // 날짜를 특정하지 않았을 때만 "지난 날짜의 완료 건 숨기기"를 서버에 요청합니다.
+    // (경리 업무일지 조회 화면의 검색/집계는 이 옵션 없이 별도로 호출되므로 영향받지 않습니다.)
+    if (!accountingFilterDate.value) params.set("hideOldDone", "1");
     const data = await api(`/api/accounting?${params.toString()}`);
     accountingEntries = data.entries;
     // 새 업무를 추가해도 항상 현장명 가나다순으로 보이도록 정렬합니다.
     accountingEntries.sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
     renderAccounting();
+    // 날짜를 특정하지 않았을 때는 지난 날짜의 "완료" 건이 자동으로 숨겨져 있다는 걸 안내하고,
+    // 특정 날짜를 선택했을 때는 이월된 건도 원래 작성일 기준으로 함께 보이고 있음을 안내합니다.
+    if (accountingFilterDate.value) {
+      accountingListHint.textContent = `${accountingFilterDate.value} 기준 — 이월된 건은 원래 작성일로도 함께 조회됩니다.`;
+    } else {
+      accountingListHint.textContent = "지난 날짜에 작성된 완료 건은 자동으로 숨겨집니다. 지난 내역을 보려면 날짜를 선택하세요.";
+    }
   }
 
   accountingFilterSite.addEventListener("change", loadAccounting);
