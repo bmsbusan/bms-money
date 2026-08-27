@@ -103,7 +103,10 @@ input:focus, select:focus {
   text-align: center;
   box-shadow: var(--shadow);
 }
-.login-box h1 { color: var(--navy); font-size: 15px; font-weight: 700; }
+.login-brand-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.login-logo { height: 52px; width: auto; display: block; flex-shrink: 0; }
+.login-brand-text { text-align: left; }
+.login-box h1 { color: var(--navy); font-size: 15px; font-weight: 700; margin: 0; }
 .login-app-name { color: var(--text); font-size: 21px; font-weight: 800; margin: 6px 0 0; letter-spacing: -0.03em; }
 .login-sub { color: var(--text-muted); font-size: 13.5px; margin: 8px 0 20px; }
 .login-box input { width: 100%; margin-bottom: 12px; }
@@ -137,7 +140,9 @@ input:focus, select:focus {
 .header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .last-sync { font-size: 12.5px; color: var(--good-text); font-weight: 600; margin-right: 4px; }
 
-.brand { display: flex; flex-direction: column; gap: 3px; line-height: 1.25; }
+.brand { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+.brand-logo { height: 42px; width: auto; display: block; flex-shrink: 0; }
+.brand-text { display: flex; flex-direction: column; gap: 3px; line-height: 1.25; }
 .brand-company { font-size: 13.5px; font-weight: 700; color: var(--primary); }
 .brand-app { font-size: 23px; font-weight: 800; color: var(--text); letter-spacing: -0.03em; }
 
@@ -574,6 +579,7 @@ td.site-badge {
   .summary-cards { grid-template-columns: repeat(2, 1fr); }
   .add-form-grid { grid-template-columns: 1fr 1fr; }
   .brand-app { font-size: 22px; }
+  .brand-logo { height: 32px; }
   .card-value { font-size: 24px; }
 
   /* ---------- 상단 탭: 가로로 드래그하지 않고 여러 줄로 나눠서 표시 ----------

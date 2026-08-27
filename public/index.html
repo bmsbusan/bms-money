@@ -4,6 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
 <title>비엠에스코리아 부산지사 | 작업내역/업무일지</title>
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#1b3a80" />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -11,8 +17,13 @@
   <!-- 로그인 화면 -->
   <div id="loginView" class="login-wrap">
     <form id="loginForm" class="login-box">
-      <h1>비엠에스코리아 부산지사</h1>
-      <p class="login-app-name">작업내역/업무일지</p>
+      <div class="login-brand-row">
+        <img class="login-logo" src="/assets/logo-mark.png" alt="BMS 로고" />
+        <div class="login-brand-text">
+          <h1>비엠에스코리아 부산지사</h1>
+          <p class="login-app-name">작업내역/업무일지</p>
+        </div>
+      </div>
       <p class="login-sub">비밀번호를 입력하고 접속하세요</p>
       <input id="loginPassword" type="password" placeholder="비밀번호" autocomplete="current-password" required />
       <button type="submit">로그인</button>
@@ -24,8 +35,11 @@
   <div id="appView" class="app-wrap hidden">
     <header class="app-header">
       <div class="brand">
-        <div class="brand-company">비엠에스코리아 부산지사</div>
-        <div class="brand-app">작업내역/업무일지</div>
+        <img class="brand-logo" src="/assets/logo-mark.png" alt="BMS 로고" />
+        <div class="brand-text">
+          <div class="brand-company">비엠에스코리아 부산지사</div>
+          <div class="brand-app">작업내역/업무일지</div>
+        </div>
       </div>
       <div class="header-actions">
         <span id="lastSync" class="last-sync"></span>
