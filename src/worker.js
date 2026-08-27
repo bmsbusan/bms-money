@@ -447,12 +447,30 @@ function rowToAccounting(row) {
     content: row.content || "",
     due_date: row.due_date || null,
     done: !!row.done,
+    carried_from: row.carried_from || null, // 자동 이월된 경우, 최초 작업일(원래 날짜)
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
 }
 
+// 미완료(done=0) 항목이 자정을 넘기면 자동으로 "오늘" 날짜로 이월됩니다.
+// 별도 예약작업(Cron) 없이, 화면을 열어서 목록을 조회할 때마다(=접속할 때마다)
+// 서버가 먼저 이 처리를 한 번 하고 나서 결과를 돌려주는 방식입니다.
+// carried_from은 최초로 이월된 시점의 "원래 작업일"만 1회 기록하고, 그 뒤로 계속
+// 갱신하지 않습니다(며칠째 미완료여도 최초 원래 날짜가 유지됩니다).
+// 날짜는 한국 시간(KST, UTC+9) 기준 자정을 기준으로 계산합니다.
+async function rolloverAccounting(env) {
+  await env.DB.prepare(
+    `UPDATE accounting_journal
+     SET carried_from = COALESCE(carried_from, work_date),
+         work_date = date('now', '+9 hours'),
+         updated_at = datetime('now')
+     WHERE done = 0 AND work_date < date('now', '+9 hours')`
+  ).run();
+}
+
 async function handleGetAccounting(request, env) {
+  await rolloverAccounting(env);
   const url = new URL(request.url);
   const site = url.searchParams.get("site") || "";
   const date = url.searchParams.get("date") || "";    // YYYY-MM-DD (특정 하루)
@@ -565,6 +583,7 @@ async function handleDeleteAccounting(id, env) {
 }
 
 async function handleAccountingSummary(env) {
+  await rolloverAccounting(env);
   // 월 + 현장 + 완료여부별 건수 집계 (프론트에서 월별/연도별로 다시 묶어서 보여줍니다)
   const { results } = await env.DB.prepare(
     `SELECT

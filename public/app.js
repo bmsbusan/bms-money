@@ -1605,7 +1605,11 @@
     return `
       <tr class="${r.done ? "paid-row" : ""}" data-id="${r.id}">
         <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
-        <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+        <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}${
+          r.carried_from
+            ? ` <span class="carried-badge" title="원래 작업일: ${escapeHtml(r.carried_from)}">이월</span>`
+            : ""
+        }</span></td>
         <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
         <td class="content-cell-wide" data-label="업무"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
         <td class="col-date" data-label="마감기한"><span class="cell-value">${escapeHtml(r.due_date) || "-"}</span></td>
@@ -2085,7 +2089,11 @@
       .map(
         (r) => `
         <tr class="${r.done ? "paid-row" : ""}">
-          <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+          <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}${
+            r.carried_from
+              ? ` <span class="carried-badge" title="원래 작업일: ${escapeHtml(r.carried_from)}">이월</span>`
+              : ""
+          }</span></td>
           <td class="site-badge" data-label="현장명"><span class="cell-value">${highlightKeyword(r.site_name, keyword)}</span></td>
           <td class="content-cell-wide" data-label="업무"><span class="cell-value">${highlightKeyword(r.content, keyword)}</span></td>
           <td class="col-date" data-label="마감기한"><span class="cell-value">${escapeHtml(r.due_date) || "-"}</span></td>

@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS accounting_journal (
   content TEXT DEFAULT '',             -- 업무 내용
   due_date TEXT,                       -- 마감기한 YYYY-MM-DD (선택)
   done INTEGER NOT NULL DEFAULT 0,     -- 완료 여부 (0/1)
+  carried_from TEXT,                   -- 자동 이월된 경우, 최초 작업일(원래 날짜) YYYY-MM-DD
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
