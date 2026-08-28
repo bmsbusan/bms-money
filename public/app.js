@@ -2785,7 +2785,7 @@
     return `
       <label class="toggle-chip">
         <input type="checkbox" data-action="${action}" data-id="${id}" ${checked ? "checked" : ""} />
-        <span class="toggle-chip-face"><span class="toggle-chip-off">대기</span><span class="toggle-chip-on">완료</span></span>
+        <span class="toggle-chip-face"><span class="toggle-chip-box"></span><span class="toggle-chip-off">대기</span><span class="toggle-chip-on">완료</span></span>
       </label>`;
   }
 
@@ -2795,7 +2795,7 @@
     return `
       <label class="toggle-chip">
         <input type="checkbox" data-edit="${editKey}" ${checked ? "checked" : ""} />
-        <span class="toggle-chip-face"><span class="toggle-chip-off">대기</span><span class="toggle-chip-on">완료</span></span>
+        <span class="toggle-chip-face"><span class="toggle-chip-box"></span><span class="toggle-chip-off">대기</span><span class="toggle-chip-on">완료</span></span>
       </label>`;
   }
 

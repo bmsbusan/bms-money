@@ -373,13 +373,17 @@ input:focus, select:focus {
 }
 .add-form-actions { margin-top: 14px; display: flex; gap: 8px; }
 
-/* ---------- 상태 토글 버튼 (품의/입금/완료): 체크박스 대신 누르는 버튼 형태 ----------
+/* ---------- 상태 토글 버튼 (품의/입금/완료): 체크박스 형태의 버튼 ----------
    실제로는 여전히 <input type="checkbox">를 사용하되(기존 저장/토글 로직 그대로 재사용),
-   화면에는 숨기고 옆의 .toggle-chip-face 를 버튼처럼 보이게 스타일링합니다. */
+   화면에는 숨기고 옆의 .toggle-chip-face 를 체크박스+버튼처럼 보이게 스타일링합니다.
+   width: fit-content 로 버튼 하나가 그리드/플렉스 칸 전체를 차지하지 않고 실제 보이는
+   크기만큼만 차지하게 해서, 버튼 밖 빈 공간에 마우스를 올려도 손 커서(클릭 가능 표시)가
+   뜨지 않게 합니다. */
 .toggle-chip {
   position: relative;
   display: inline-flex;
   align-items: center;
+  width: fit-content;
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -397,9 +401,9 @@ input:focus, select:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   min-width: 64px;
-  padding: 8px 15px;
+  padding: 8px 15px 8px 11px;
   border-radius: 999px;
   font-size: 12.5px;
   font-weight: 700;
@@ -409,11 +413,36 @@ input:focus, select:focus {
   color: var(--text-muted);
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
+/* 체크박스 표시: 문구 왼쪽의 작은 사각형. 미체크 상태에서는 빈 사각형, 체크되면
+   버튼 배경이 초록으로 바뀌면서 이 사각형 안에 흰 배경 + 초록 체크마크가 나타납니다. */
+.toggle-chip-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  border: 1.5px solid var(--border-strong);
+  background: #fff;
+  color: transparent;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.toggle-chip-box::after { content: "\2713"; }
 .toggle-chip:hover .toggle-chip-face { border-color: var(--primary); color: var(--primary-dark); }
+.toggle-chip:hover .toggle-chip-face .toggle-chip-box { border-color: var(--primary); }
 .toggle-chip input:checked ~ .toggle-chip-face {
   background: var(--good-text);
   border-color: var(--good-text);
   color: #fff;
+}
+.toggle-chip input:checked ~ .toggle-chip-face .toggle-chip-box {
+  border-color: #fff;
+  background: #fff;
+  color: var(--good-text);
 }
 .toggle-chip input:checked ~ .toggle-chip-face:hover { background: #156b40; border-color: #156b40; }
 .toggle-chip input:focus-visible ~ .toggle-chip-face { box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.25); }
@@ -424,6 +453,9 @@ input:focus, select:focus {
 /* 새 항목 추가 폼 안의 토글(품의 올림/입금됨/완료)은 문구가 고정되어 있고, 배경색만 바뀝니다. */
 .toggle-chip-static { height: 40px; }
 .toggle-chip-static .toggle-chip-face { min-width: auto; height: 100%; }
+/* 품의 올림 / 입금됨처럼 짝을 이루는 토글 버튼을 가깝게 붙여서 배치하는 묶음.
+   묶음 자체도 width: fit-content 로, 넓은 그리드 칸 안에서도 두 버튼이 바짝 붙어 보입니다. */
+.toggle-chip-pair { display: flex; align-items: center; gap: 10px; width: fit-content; height: 40px; }
 
 /* ---------- 업무일지: 주간/월간 시설 작업일지 엑셀 다운로드 ---------- */
 .export-bar {

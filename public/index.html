@@ -105,14 +105,16 @@
         </label>
         <input id="newContent" type="text" placeholder="내용 입력" />
         <input id="newCost" type="number" placeholder="비용 입력 (원)" min="0" />
-        <label class="toggle-chip toggle-chip-static">
-          <input id="newBilled" type="checkbox" />
-          <span class="toggle-chip-face">품의 올림</span>
-        </label>
-        <label class="toggle-chip toggle-chip-static">
-          <input id="newPaid" type="checkbox" />
-          <span class="toggle-chip-face">입금됨</span>
-        </label>
+        <div class="toggle-chip-pair">
+          <label class="toggle-chip toggle-chip-static">
+            <input id="newBilled" type="checkbox" />
+            <span class="toggle-chip-face"><span class="toggle-chip-box"></span>품의 올림</span>
+          </label>
+          <label class="toggle-chip toggle-chip-static">
+            <input id="newPaid" type="checkbox" />
+            <span class="toggle-chip-face"><span class="toggle-chip-box"></span>입금됨</span>
+          </label>
+        </div>
         <label class="field-label">입금일
           <input id="newPaidDate" type="date" />
         </label>
@@ -289,7 +291,7 @@
           </label>
           <label class="toggle-chip toggle-chip-static">
             <input id="newAccountingDone" type="checkbox" />
-            <span class="toggle-chip-face">완료</span>
+            <span class="toggle-chip-face"><span class="toggle-chip-box"></span>완료</span>
           </label>
         </div>
         <div class="add-form-actions">
