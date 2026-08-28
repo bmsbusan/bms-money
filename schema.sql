@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS journal_entries (
   content TEXT DEFAULT '',             -- 작업내역
   remarks TEXT DEFAULT '',             -- 비고
   done INTEGER NOT NULL DEFAULT 0,     -- 완료 여부 (0/1)
+  carried_from TEXT,                   -- 자동 이월된 경우, 최초 작업일(원래 날짜) YYYY-MM-DD
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -307,12 +307,28 @@ function rowToJournal(row) {
     content: row.content || "",
     remarks: row.remarks || "",
     done: !!row.done,
+    carried_from: row.carried_from || null, // 자동 이월된 경우, 최초 작업일(원래 날짜)
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
 }
 
+// 미완료(done=0) 업무일지 항목이 자정을 넘기면 자동으로 "오늘" 날짜로 이월됩니다.
+// (경리 업무일지의 rolloverAccounting()과 완전히 같은 방식입니다.) 완료된 항목은
+// 원래 작업일 그대로 남아있고, carried_from은 최초 이월 시점의 원래 작업일만 1회
+// 기록한 뒤로 계속 갱신하지 않습니다. 날짜는 한국 시간(KST, UTC+9) 자정 기준입니다.
+async function rolloverJournal(env) {
+  await env.DB.prepare(
+    `UPDATE journal_entries
+     SET carried_from = COALESCE(carried_from, work_date),
+         work_date = date('now', '+9 hours'),
+         updated_at = datetime('now')
+     WHERE done = 0 AND work_date < date('now', '+9 hours')`
+  ).run();
+}
+
 async function handleGetJournal(request, env) {
+  await rolloverJournal(env);
   const url = new URL(request.url);
   const site = url.searchParams.get("site") || "";
   const month = url.searchParams.get("month") || ""; // YYYY-MM

@@ -572,10 +572,10 @@
         <td class="content-cell" data-label="내용" title="${escapeHtml(r.content)}"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
         <td class="col-cost" data-label="비용"><span class="cell-value">${won(r.cost)}</span></td>
         <td class="col-check" data-label="품의">
-          <input type="checkbox" data-action="toggle-billed" data-id="${r.id}" ${r.billed ? "checked" : ""} />
+          <span class="cell-value">${toggleChipHtml("toggle-billed", r.id, r.billed)}</span>
         </td>
         <td class="col-check" data-label="입금">
-          <input type="checkbox" data-action="toggle-paid" data-id="${r.id}" ${r.paid ? "checked" : ""} />
+          <span class="cell-value">${toggleChipHtml("toggle-paid", r.id, r.paid)}</span>
         </td>
         <td class="col-date" data-label="입금일">
           <input type="date" class="edit-input" data-action="change-date" data-id="${r.id}" value="${r.paid_date || ""}" />
@@ -603,10 +603,10 @@
         <td data-label="내용"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
         <td class="col-cost" data-label="비용"><input class="edit-input" type="number" min="0" data-edit="cost" value="${r.cost}" /></td>
         <td class="col-check" data-label="품의">
-          <input type="checkbox" data-edit="billed" ${r.billed ? "checked" : ""} />
+          <span class="cell-value">${toggleChipEditHtml("billed", r.billed)}</span>
         </td>
         <td class="col-check" data-label="입금">
-          <input type="checkbox" data-edit="paid" ${r.paid ? "checked" : ""} />
+          <span class="cell-value">${toggleChipEditHtml("paid", r.paid)}</span>
         </td>
         <td class="col-date" data-label="입금일"><input class="edit-input" type="date" data-edit="paid_date" value="${r.paid_date || ""}" /></td>
         <td class="col-bank" data-label="입금 통장"><select class="edit-input" data-edit="bank_account">${bankAccountOptionsHtml(r.bank_account)}</select></td>
@@ -975,12 +975,16 @@
     return `
       <tr class="${r.done ? "paid-row" : ""}" data-id="${r.id}">
         <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
-        <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+        <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}${
+          r.carried_from
+            ? ` <span class="carried-badge" title="원래 작업일: ${escapeHtml(r.carried_from)}">이월</span>`
+            : ""
+        }</span></td>
         <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
         <td class="content-cell-wide" data-label="작업내역"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
         <td class="content-cell-wide" data-label="비고"><span class="cell-value">${escapeHtml(r.remarks) || "-"}</span></td>
         <td class="col-check" data-label="완료">
-          <input type="checkbox" data-action="toggle-journal-done" data-id="${r.id}" ${r.done ? "checked" : ""} />
+          <span class="cell-value">${toggleChipHtml("toggle-journal-done", r.id, r.done)}</span>
         </td>
         <td class="col-manage" data-label="관리">
           <span class="row-actions">
@@ -1003,7 +1007,7 @@
         <td data-label="작업내역"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
         <td data-label="비고"><input class="edit-input" data-edit="remarks" value="${escapeHtml(r.remarks)}" /></td>
         <td class="col-check" data-label="완료">
-          <input type="checkbox" data-edit="done" ${r.done ? "checked" : ""} />
+          <span class="cell-value">${toggleChipEditHtml("done", r.done)}</span>
         </td>
         <td class="col-manage" data-label="관리">
           <span class="row-actions">
@@ -1625,7 +1629,7 @@
         <td class="content-cell-wide" data-label="업무"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
         <td class="col-date" data-label="마감기한"><span class="cell-value">${escapeHtml(r.due_date) || "-"}</span></td>
         <td class="col-check" data-label="완료">
-          <input type="checkbox" data-action="toggle-accounting-done" data-id="${r.id}" ${r.done ? "checked" : ""} />
+          <span class="cell-value">${toggleChipHtml("toggle-accounting-done", r.id, r.done)}</span>
         </td>
         <td class="col-manage" data-label="관리">
           <span class="row-actions">
@@ -1648,7 +1652,7 @@
         <td data-label="업무"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
         <td class="col-date" data-label="마감기한"><input class="edit-input" type="date" data-edit="due_date" value="${r.due_date || ""}" /></td>
         <td class="col-check" data-label="완료">
-          <input type="checkbox" data-edit="done" ${r.done ? "checked" : ""} />
+          <span class="cell-value">${toggleChipEditHtml("done", r.done)}</span>
         </td>
         <td class="col-manage" data-label="관리">
           <span class="row-actions">
@@ -2227,7 +2231,7 @@
         <td class="col-date" data-label="예정일"><span class="cell-value">${escapeHtml(r.due_date) || "-"}</span></td>
         <td class="content-cell-wide" data-label="비고"><span class="cell-value">${escapeHtml(r.remarks) || "-"}</span></td>
         <td class="col-check" data-label="완료">
-          <input type="checkbox" data-action="toggle-followup-status" data-id="${r.id}" ${r.status ? "checked" : ""} />
+          <span class="cell-value">${toggleChipHtml("toggle-followup-status", r.id, r.status)}</span>
         </td>
         <td class="col-manage" data-label="관리">
           <span class="row-actions">
@@ -2250,7 +2254,7 @@
         <td class="col-date" data-label="예정일"><input class="edit-input" type="date" data-edit="due_date" value="${r.due_date || ""}" /></td>
         <td data-label="비고"><input class="edit-input" data-edit="remarks" value="${escapeHtml(r.remarks)}" /></td>
         <td class="col-check" data-label="완료">
-          <input type="checkbox" data-edit="status" ${r.status ? "checked" : ""} />
+          <span class="cell-value">${toggleChipEditHtml("status", r.status)}</span>
         </td>
         <td class="col-manage" data-label="관리">
           <span class="row-actions">
@@ -2430,7 +2434,7 @@
       followupCalDetailList.innerHTML = items
         .map((r) => `
           <div class="cal-detail-item" data-id="${r.id}">
-            <input type="checkbox" data-action="toggle-followup-status" data-id="${r.id}" ${r.status ? "checked" : ""} />
+            ${toggleChipHtml("toggle-followup-status", r.id, r.status)}
             <span class="cal-detail-site">${escapeHtml(r.site_name)}</span>
             <span class="cal-detail-content">${escapeHtml(r.content) || "-"}</span>
             <span class="cal-detail-remarks">${escapeHtml(r.remarks) || ""}</span>
@@ -2773,6 +2777,27 @@
     overviewExpandedPeriods.clear();
     await runOverviewSearch({ month: "" });
   });
+
+  // ---------- 상태 토글 버튼 (품의/입금/완료) 공통 렌더링 ----------
+  // 체크박스는 그대로 두고(기존 change 이벤트 로직 재사용), 화면에는 버튼처럼 보이는
+  // .toggle-chip-face 를 보여줍니다. 미완료(대기)/완료 문구는 체크 여부에 따라 CSS로 전환됩니다.
+  function toggleChipHtml(action, id, checked) {
+    return `
+      <label class="toggle-chip">
+        <input type="checkbox" data-action="${action}" data-id="${id}" ${checked ? "checked" : ""} />
+        <span class="toggle-chip-face"><span class="toggle-chip-off">대기</span><span class="toggle-chip-on">완료</span></span>
+      </label>`;
+  }
+
+  // 인라인 수정(edit) 행에서 쓰는 버전: data-id 없이 data-edit 키만 붙입니다
+  // (저장 시 같은 행 안에서 querySelector('[data-edit="..."]')로 값을 읽어갑니다).
+  function toggleChipEditHtml(editKey, checked) {
+    return `
+      <label class="toggle-chip">
+        <input type="checkbox" data-edit="${editKey}" ${checked ? "checked" : ""} />
+        <span class="toggle-chip-face"><span class="toggle-chip-off">대기</span><span class="toggle-chip-on">완료</span></span>
+      </label>`;
+  }
 
   function escapeHtml(str) {
     return String(str ?? "").replace(/[&<>"']/g, (c) => ({
