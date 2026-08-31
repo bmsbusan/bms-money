@@ -166,6 +166,22 @@
   const followupCalDetailList = $("#followupCalDetailList");
   const followupCalDetailEmpty = $("#followupCalDetailEmpty");
 
+  // ---------- 현장별 계좌번호 정리 화면 요소 ----------
+  const siteAccountsSection = $("#siteAccountsSection");
+  const siteAccountsSearchInput = $("#siteAccountsSearchInput");
+  const siteAccountsSearchResetBtn = $("#siteAccountsSearchResetBtn");
+  const addSiteAccountBtn = $("#addSiteAccountBtn");
+  const siteAccountAddForm = $("#siteAccountAddForm");
+  const newSiteAccountSite = $("#newSiteAccountSite");
+  const newSiteAccountBank = $("#newSiteAccountBank");
+  const newSiteAccountHolder = $("#newSiteAccountHolder");
+  const newSiteAccountNumber = $("#newSiteAccountNumber");
+  const saveSiteAccountBtn = $("#saveSiteAccountBtn");
+  const cancelSiteAccountBtn = $("#cancelSiteAccountBtn");
+  const siteAccountAddError = $("#siteAccountAddError");
+  const siteAccountsBody = $("#siteAccountsBody");
+  const siteAccountsEmptyMsg = $("#siteAccountsEmptyMsg");
+
   // ---------- 작업내역 조회 화면 요소 ----------
   const overviewSection = $("#overviewSection");
   const overviewModeMonthBtn = $("#overviewModeMonthBtn");
@@ -227,6 +243,12 @@
   // 기본값을 true로 두어, 탭을 열면 "검색" 버튼을 누르지 않아도 바로 전체 내역 목록이 보이게 합니다.
   let overviewSearching = true;
   let overviewDrilldownMonth = ""; // 월별 집계에서 현장별 상세를 눌러 들어왔을 때의 월(YYYY-MM)
+
+  // 현장별 계좌번호 정리 상태
+  let siteAccounts = [];
+  let editingSiteAccountId = null;
+  let siteAccountsKeyword = "";
+  let siteAccountCopiedTimers = new Map(); // id -> setTimeout id ("복사됨!" 버튼 상태를 되돌리는 타이머)
 
   const won = (n) => (Number(n) || 0).toLocaleString("ko-KR") + "원";
 
@@ -293,6 +315,7 @@
       accountingOverview: accountingOverviewSection,
       followup: followupSection,
       overview: overviewSection,
+      siteAccounts: siteAccountsSection,
     };
     listSection.classList.toggle("hidden", !CATEGORIES.includes(tab));
     Object.entries(sectionsByTab).forEach(([key, el]) => {
@@ -311,6 +334,8 @@
       loadFollowups();
     } else if (tab === "overview") {
       loadOverview();
+    } else if (tab === "siteAccounts") {
+      loadSiteAccounts();
     } else {
       loadRecords();
     }
@@ -354,6 +379,8 @@
       if (editingFollowupId === null) loadFollowups();
     } else if (activeTab === "overview") {
       loadOverview();
+    } else if (activeTab === "siteAccounts") {
+      if (editingSiteAccountId === null) loadSiteAccounts();
     } else {
       if (editingId === null) loadRecords();
     }
@@ -2776,6 +2803,188 @@
     overviewSearchHint.classList.add("hidden");
     overviewExpandedPeriods.clear();
     await runOverviewSearch({ month: "" });
+  });
+
+  // ================= 현장별 계좌번호 정리 (관리비 납부 계좌 안내 문구 복사) =================
+
+  async function loadSiteAccounts() {
+    const params = new URLSearchParams();
+    if (siteAccountsKeyword) params.set("keyword", siteAccountsKeyword);
+    const data = await api(`/api/site-accounts?${params.toString()}`);
+    siteAccounts = data.accounts;
+    renderSiteAccounts();
+  }
+
+  siteAccountsSearchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      siteAccountsKeyword = siteAccountsSearchInput.value.trim();
+      loadSiteAccounts();
+    }
+  });
+  siteAccountsSearchResetBtn.addEventListener("click", () => {
+    siteAccountsSearchInput.value = "";
+    siteAccountsKeyword = "";
+    loadSiteAccounts();
+  });
+
+  addSiteAccountBtn.addEventListener("click", () => {
+    siteAccountAddError.textContent = "";
+    siteAccountAddForm.classList.toggle("hidden");
+  });
+  cancelSiteAccountBtn.addEventListener("click", () => {
+    siteAccountAddForm.classList.add("hidden");
+    resetSiteAccountAddForm();
+  });
+
+  function resetSiteAccountAddForm() {
+    newSiteAccountSite.value = "";
+    newSiteAccountBank.value = "";
+    newSiteAccountHolder.value = "";
+    newSiteAccountNumber.value = "";
+    siteAccountAddError.textContent = "";
+  }
+
+  saveSiteAccountBtn.addEventListener("click", async () => {
+    siteAccountAddError.textContent = "";
+    if (!newSiteAccountSite.value.trim()) { siteAccountAddError.textContent = "현장명을 입력해주세요."; return; }
+    if (!newSiteAccountNumber.value.trim()) { siteAccountAddError.textContent = "계좌번호를 입력해주세요."; return; }
+    try {
+      await api("/api/site-accounts", {
+        method: "POST",
+        body: JSON.stringify({
+          site_name: newSiteAccountSite.value,
+          bank: newSiteAccountBank.value,
+          account_holder: newSiteAccountHolder.value,
+          account_number: newSiteAccountNumber.value,
+        }),
+      });
+      siteAccountAddForm.classList.add("hidden");
+      resetSiteAccountAddForm();
+      await loadSiteAccounts();
+    } catch (err) {
+      siteAccountAddError.textContent = err.message;
+    }
+  });
+
+  function renderSiteAccounts() {
+    if (siteAccounts.length === 0) {
+      siteAccountsBody.innerHTML = "";
+      siteAccountsEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    siteAccountsEmptyMsg.classList.add("hidden");
+    siteAccountsBody.innerHTML = siteAccounts
+      .map((r, i) => (editingSiteAccountId === r.id ? siteAccountEditRowHtml(r, i) : siteAccountViewRowHtml(r, i)))
+      .join("");
+  }
+
+  function siteAccountViewRowHtml(r, i) {
+    return `
+      <tr data-id="${r.id}">
+        <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
+        <td data-label="은행"><span class="cell-value">${escapeHtml(r.bank) || "-"}</span></td>
+        <td data-label="예금주"><span class="cell-value">${escapeHtml(r.account_holder) || "-"}</span></td>
+        <td class="content-cell-wide" data-label="계좌번호"><span class="cell-value">${escapeHtml(r.account_number)}</span></td>
+        <td data-label="납부금액"><span class="cell-value"><input class="edit-input amount-input" type="text" inputmode="numeric" data-amount-id="${r.id}" placeholder="예: 150000" /></span></td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-primary btn-sm" data-action="copy-site-account" data-id="${r.id}">텍스트 복사</button>
+            <button class="btn btn-ghost btn-sm" data-action="edit-site-account" data-id="${r.id}">수정</button>
+            <button class="btn btn-danger btn-sm" data-action="delete-site-account" data-id="${r.id}">삭제</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  function siteAccountEditRowHtml(r, i) {
+    return `
+      <tr data-id="${r.id}">
+        <td data-label="현장명"><input class="edit-input" data-edit="site_name" value="${escapeHtml(r.site_name)}" /></td>
+        <td data-label="은행"><input class="edit-input" data-edit="bank" value="${escapeHtml(r.bank)}" /></td>
+        <td data-label="예금주"><input class="edit-input" data-edit="account_holder" value="${escapeHtml(r.account_holder)}" /></td>
+        <td class="content-cell-wide" data-label="계좌번호"><input class="edit-input" data-edit="account_number" value="${escapeHtml(r.account_number)}" /></td>
+        <td data-label="납부금액"><span class="cell-value">-</span></td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-primary btn-sm" data-action="save-edit-site-account" data-id="${r.id}">저장</button>
+            <button class="btn btn-ghost btn-sm" data-action="cancel-edit-site-account" data-id="${r.id}">취소</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  function buildSiteAccountMessage(r, amountRaw) {
+    const amountDigits = String(amountRaw || "").replace(/[^0-9]/g, "");
+    const amountLine = amountDigits ? `${Number(amountDigits).toLocaleString("ko-KR")}원` : "";
+    return (
+      `안녕하십니까 ${r.site_name} 관리업체 비엠에스코리아 부산지사입니다.\n` +
+      `관리비 납부 계좌 안내드립니다.\n` +
+      `계좌번호: (${r.bank}) ${r.account_holder} ${r.account_number}\n` +
+      `납부금액: ${amountLine}`
+    );
+  }
+
+  siteAccountsBody.addEventListener("click", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (!action || !id) return;
+
+    if (action === "edit-site-account") {
+      editingSiteAccountId = Number(id);
+      renderSiteAccounts();
+    } else if (action === "cancel-edit-site-account") {
+      editingSiteAccountId = null;
+      renderSiteAccounts();
+    } else if (action === "save-edit-site-account") {
+      const row = e.target.closest("tr");
+      const patch = {
+        site_name: row.querySelector('[data-edit="site_name"]').value,
+        bank: row.querySelector('[data-edit="bank"]').value,
+        account_holder: row.querySelector('[data-edit="account_holder"]').value,
+        account_number: row.querySelector('[data-edit="account_number"]').value,
+      };
+      try {
+        await api(`/api/site-accounts/${id}`, { method: "PUT", body: JSON.stringify(patch) });
+        editingSiteAccountId = null;
+        await loadSiteAccounts();
+      } catch (err) {
+        alert(err.message);
+      }
+    } else if (action === "delete-site-account") {
+      if (!confirm("이 계좌 정보를 삭제할까요?")) return;
+      try {
+        await api(`/api/site-accounts/${id}`, { method: "DELETE" });
+        await loadSiteAccounts();
+      } catch (err) {
+        alert(err.message);
+      }
+    } else if (action === "copy-site-account") {
+      const record = siteAccounts.find((s) => s.id === Number(id));
+      if (!record) return;
+      const row = e.target.closest("tr");
+      const amountInput = row.querySelector(`[data-amount-id="${id}"]`);
+      const message = buildSiteAccountMessage(record, amountInput ? amountInput.value : "");
+      try {
+        await navigator.clipboard.writeText(message);
+      } catch (err) {
+        alert("클립보드 복사에 실패했습니다. 브라우저 권한을 확인해주세요.");
+        return;
+      }
+      const btn = e.target;
+      const originalText = btn.textContent;
+      btn.textContent = "복사됨!";
+      btn.classList.remove("btn-primary");
+      btn.classList.add("btn-success");
+      const prevTimer = siteAccountCopiedTimers.get(id);
+      if (prevTimer) clearTimeout(prevTimer);
+      const timer = setTimeout(() => {
+        btn.textContent = originalText;
+        btn.classList.remove("btn-success");
+        btn.classList.add("btn-primary");
+        siteAccountCopiedTimers.delete(id);
+      }, 1500);
+      siteAccountCopiedTimers.set(id, timer);
+    }
   });
 
   // ---------- 상태 토글 버튼 (품의/입금/완료) 공통 렌더링 ----------

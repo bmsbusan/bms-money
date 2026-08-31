@@ -58,6 +58,7 @@
       <button class="tab-btn" data-tab="accounting">경리 업무일지</button>
       <button class="tab-btn" data-tab="accountingOverview">경리 업무일지 조회</button>
       <button class="tab-btn" data-tab="followup">후속 작업</button>
+      <button class="tab-btn" data-tab="siteAccounts">현장별 계좌번호 정리</button>
     </nav>
 
     <div id="listSection">
@@ -527,6 +528,48 @@
           <tbody id="overviewSearchBody"></tbody>
         </table>
         <p id="overviewEmptyMsg" class="empty-msg hidden">표시할 내역이 없습니다.</p>
+      </section>
+    </div>
+
+    <!-- 현장별 계좌번호 정리 화면 (관리비 납부 계좌 안내 문구 복사) -->
+    <div id="siteAccountsSection" class="hidden">
+      <section class="toolbar">
+        <div class="filters search-filters">
+          <input id="siteAccountsSearchInput" type="text" placeholder="현장명·은행·예금주·계좌번호 검색" />
+          <button id="siteAccountsSearchResetBtn" class="btn btn-ghost">초기화</button>
+        </div>
+        <button id="addSiteAccountBtn" class="btn btn-primary">+ 새 계좌 추가</button>
+      </section>
+
+      <section id="siteAccountAddForm" class="add-form hidden">
+        <div class="add-form-grid">
+          <input id="newSiteAccountSite" type="text" placeholder="현장명 입력" />
+          <input id="newSiteAccountBank" type="text" placeholder="은행명 입력" />
+          <input id="newSiteAccountHolder" type="text" placeholder="예금주 입력" />
+          <input id="newSiteAccountNumber" type="text" placeholder="계좌번호 입력" />
+        </div>
+        <div class="add-form-actions">
+          <button id="saveSiteAccountBtn" class="btn btn-primary">저장</button>
+          <button id="cancelSiteAccountBtn" class="btn btn-ghost">취소</button>
+        </div>
+        <p id="siteAccountAddError" class="error-msg"></p>
+      </section>
+
+      <section class="table-wrap">
+        <table id="siteAccountsTable">
+          <thead>
+            <tr>
+              <th class="col-site">현장명</th>
+              <th>은행</th>
+              <th>예금주</th>
+              <th class="col-content-wide">계좌번호</th>
+              <th>납부금액</th>
+              <th class="col-manage">관리</th>
+            </tr>
+          </thead>
+          <tbody id="siteAccountsBody"></tbody>
+        </table>
+        <p id="siteAccountsEmptyMsg" class="empty-msg hidden">등록된 계좌 정보가 없습니다. "+ 새 계좌 추가"로 등록해주세요.</p>
       </section>
     </div>
   </div>

@@ -775,6 +775,100 @@ async function handleMonthlySummary(env) {
   return json({ rows: results });
 }
 
+// ---- 현장별 계좌번호 정리 (site_accounts) ----
+
+function rowToSiteAccount(row) {
+  return {
+    id: row.id,
+    site_name: row.site_name,
+    bank: row.bank || "",
+    account_holder: row.account_holder || "",
+    account_number: row.account_number || "",
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function handleGetSiteAccounts(request, env) {
+  const url = new URL(request.url);
+  const keyword = url.searchParams.get("keyword") || "";
+
+  let query = "SELECT * FROM site_accounts WHERE 1=1";
+  const binds = [];
+  if (keyword) {
+    query += " AND (site_name LIKE ? OR bank LIKE ? OR account_holder LIKE ? OR account_number LIKE ?)";
+    const k = `%${keyword}%`;
+    binds.push(k, k, k, k);
+  }
+  query += " ORDER BY site_name ASC, id ASC";
+
+  const stmt = env.DB.prepare(query).bind(...binds);
+  const { results } = await stmt.all();
+  return json({ accounts: results.map(rowToSiteAccount) });
+}
+
+async function handleCreateSiteAccount(request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+  const site_name = typeof body.site_name === "string" ? body.site_name.trim() : "";
+  const bank = typeof body.bank === "string" ? body.bank.trim() : "";
+  const account_holder = typeof body.account_holder === "string" ? body.account_holder.trim() : "";
+  const account_number = typeof body.account_number === "string" ? body.account_number.trim() : "";
+
+  if (!site_name) return badRequest("현장명을 입력해주세요.");
+  if (!account_number) return badRequest("계좌번호를 입력해주세요.");
+
+  const result = await env.DB.prepare(
+    `INSERT INTO site_accounts (site_name, bank, account_holder, account_number, created_at, updated_at)
+     VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))`
+  )
+    .bind(site_name, bank, account_holder, account_number)
+    .run();
+
+  return json({ ok: true, id: result.meta.last_row_id });
+}
+
+async function handleUpdateSiteAccount(id, request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+
+  const fields = [];
+  const binds = [];
+
+  if (typeof body.site_name === "string") {
+    fields.push("site_name = ?");
+    binds.push(body.site_name.trim());
+  }
+  if (typeof body.bank === "string") {
+    fields.push("bank = ?");
+    binds.push(body.bank.trim());
+  }
+  if (typeof body.account_holder === "string") {
+    fields.push("account_holder = ?");
+    binds.push(body.account_holder.trim());
+  }
+  if (typeof body.account_number === "string") {
+    fields.push("account_number = ?");
+    binds.push(body.account_number.trim());
+  }
+
+  if (fields.length === 0) return badRequest("수정할 내용이 없습니다.");
+
+  fields.push("updated_at = datetime('now')");
+  binds.push(id);
+
+  await env.DB.prepare(`UPDATE site_accounts SET ${fields.join(", ")} WHERE id = ?`)
+    .bind(...binds)
+    .run();
+
+  return json({ ok: true });
+}
+
+async function handleDeleteSiteAccount(id, env) {
+  await env.DB.prepare("DELETE FROM site_accounts WHERE id = ?").bind(id).run();
+  return json({ ok: true });
+}
+
 // ---- 메인 fetch 핸들러 ----
 
 export default {
@@ -878,6 +972,20 @@ export default {
       }
       if (followupMatch && method === "DELETE") {
         return await handleDeleteFollowup(Number(followupMatch[1]), env);
+      }
+
+      if (path === "/api/site-accounts" && method === "GET") {
+        return await handleGetSiteAccounts(request, env);
+      }
+      if (path === "/api/site-accounts" && method === "POST") {
+        return await handleCreateSiteAccount(request, env);
+      }
+      const siteAccountMatch = path.match(/^\/api\/site-accounts\/(\d+)$/);
+      if (siteAccountMatch && method === "PUT") {
+        return await handleUpdateSiteAccount(Number(siteAccountMatch[1]), request, env);
+      }
+      if (siteAccountMatch && method === "DELETE") {
+        return await handleDeleteSiteAccount(Number(siteAccountMatch[1]), env);
       }
 
       return json({ error: "Not Found" }, { status: 404 });
