@@ -249,6 +249,7 @@
   let editingSiteAccountId = null;
   let siteAccountsKeyword = "";
   let siteAccountCopiedTimers = new Map(); // id -> setTimeout id ("복사됨!" 버튼 상태를 되돌리는 타이머)
+  let siteAccountAmounts = new Map(); // id -> 입력 중인 납부금액 문자열(다른 행 수정 등으로 표가 다시 그려져도 유지)
 
   const won = (n) => (Number(n) || 0).toLocaleString("ko-KR") + "원";
 
@@ -380,7 +381,10 @@
     } else if (activeTab === "overview") {
       loadOverview();
     } else if (activeTab === "siteAccounts") {
-      if (editingSiteAccountId === null) loadSiteAccounts();
+      // 이 탭은 계좌번호 드래그(텍스트 선택)나 납부금액 입력 중에 표가 통째로
+      // 다시 그려지면 선택/입력이 끊기는 문제가 있어(자동 새로고침 주기와 겹침),
+      // 다른 탭과 달리 5초 자동 새로고침 대상에서 제외합니다. 데이터는 탭을 다시
+      // 열거나 검색/추가/수정/삭제 시 그때그때 최신으로 불러옵니다.
     } else {
       if (editingId === null) loadRecords();
     }
@@ -2885,7 +2889,7 @@
         <td data-label="은행"><span class="cell-value">${escapeHtml(r.bank) || "-"}</span></td>
         <td data-label="예금주"><span class="cell-value">${escapeHtml(r.account_holder) || "-"}</span></td>
         <td class="content-cell-wide" data-label="계좌번호"><span class="cell-value">${escapeHtml(r.account_number)}</span></td>
-        <td data-label="납부금액"><span class="cell-value"><input class="edit-input amount-input" type="text" inputmode="numeric" data-amount-id="${r.id}" placeholder="예: 150000" /></span></td>
+        <td data-label="납부금액"><span class="cell-value"><input class="edit-input amount-input" type="text" inputmode="numeric" data-amount-id="${r.id}" placeholder="예: 150000" value="${escapeHtml(siteAccountAmounts.get(r.id) || "")}" /></span></td>
         <td class="col-manage" data-label="관리">
           <span class="row-actions">
             <button class="btn btn-primary btn-sm" data-action="copy-site-account" data-id="${r.id}">텍스트 복사</button>
@@ -2923,6 +2927,14 @@
       `납부금액: ${amountLine}`
     );
   }
+
+  // 납부금액 입력칸은 서버에 저장되지 않으므로, 다른 행을 수정/삭제해 표 전체가
+  // 다시 그려지더라도 입력하던 값이 사라지지 않도록 여기(siteAccountAmounts)에 따로 보관합니다.
+  siteAccountsBody.addEventListener("input", (e) => {
+    const amountId = e.target.getAttribute("data-amount-id");
+    if (!amountId) return;
+    siteAccountAmounts.set(Number(amountId), e.target.value);
+  });
 
   siteAccountsBody.addEventListener("click", async (e) => {
     const action = e.target.getAttribute("data-action");
