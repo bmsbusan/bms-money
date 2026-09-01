@@ -16,6 +16,10 @@ const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30일
 const ALLOWED_CATEGORIES = ["작업내역", "소독", "저수조청소"];
 const DEFAULT_CATEGORY = "작업내역";
 
+// 현장별 1년 스케줄표 태그 종류
+const SCHEDULE_TAGS = ["보험", "건물 점검", "설비 점검", "소독", "저수조청소", "기타"];
+const DEFAULT_SCHEDULE_TAG = "기타";
+
 function json(data, init = {}) {
   return new Response(JSON.stringify(data), {
     ...init,
@@ -994,6 +998,149 @@ async function handleDeleteWorkMemo(id, env) {
   return json({ ok: true });
 }
 
+// ---- 현장별 1년 스케줄표 (site_schedules) ----
+// 보험 만기, 법정 점검, 소독, 저수조청소 등 현장별로 반복되는 일정(만기 도래일 기준)을
+// 관리합니다. 만기 도래일은 화면에서 언제든 직접 입력/수정할 수 있습니다.
+
+function rowToSchedule(row) {
+  return {
+    id: row.id,
+    site_name: row.site_name,
+    category: row.category || "",
+    remarks: row.remarks || "",
+    due_date: row.due_date || null,
+    amount: row.amount || "",
+    fee_note: row.fee_note || "",
+    tag: row.tag || DEFAULT_SCHEDULE_TAG,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function normalizeScheduleTag(tag) {
+  return SCHEDULE_TAGS.includes(tag) ? tag : DEFAULT_SCHEDULE_TAG;
+}
+
+async function handleGetSchedules(request, env) {
+  const url = new URL(request.url);
+  const site = url.searchParams.get("site") || "";
+  const tag = url.searchParams.get("tag") || "";
+  const from = url.searchParams.get("from") || "";     // YYYY-MM-DD
+  const to = url.searchParams.get("to") || "";         // YYYY-MM-DD
+  const keyword = url.searchParams.get("keyword") || "";
+  const sort = url.searchParams.get("sort") === "desc" ? "DESC" : "ASC"; // 기본 오름차순
+
+  let query = "SELECT * FROM site_schedules WHERE 1=1";
+  const binds = [];
+  if (site) {
+    query += " AND site_name = ?";
+    binds.push(site);
+  }
+  if (tag) {
+    query += " AND tag = ?";
+    binds.push(tag);
+  }
+  if (from) {
+    query += " AND due_date >= ?";
+    binds.push(from);
+  }
+  if (to) {
+    query += " AND due_date <= ?";
+    binds.push(to);
+  }
+  if (keyword) {
+    query += " AND (site_name LIKE ? OR category LIKE ? OR remarks LIKE ?)";
+    const k = `%${keyword}%`;
+    binds.push(k, k, k);
+  }
+  // 만기 도래일 기준 오름차순 정렬(요청사항). 만기일이 없는(NULL) 항목은 정렬 순서상
+  // 맨 뒤로 보냅니다(그렇지 않으면 SQLite 기본 동작상 NULL이 맨 앞으로 와서 날짜순
+  // 정렬의 의미가 흐려짐).
+  query += ` ORDER BY (due_date IS NULL) ASC, due_date ${sort}, id ASC`;
+
+  const stmt = env.DB.prepare(query).bind(...binds);
+  const { results } = await stmt.all();
+  return json({ entries: results.map(rowToSchedule), tags: SCHEDULE_TAGS });
+}
+
+async function handleCreateSchedule(request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+  const site_name = typeof body.site_name === "string" ? body.site_name.trim() : "";
+  const category = typeof body.category === "string" ? body.category.trim() : "";
+  const remarks = typeof body.remarks === "string" ? body.remarks.trim() : "";
+  const due_date = typeof body.due_date === "string" && body.due_date ? body.due_date : null;
+  const amount = typeof body.amount === "string" ? body.amount.trim() : "";
+  const fee_note = typeof body.fee_note === "string" ? body.fee_note.trim() : "";
+  const tag = normalizeScheduleTag(body.tag);
+
+  if (!site_name) return badRequest("현장명을 입력해주세요.");
+  if (!category) return badRequest("구분(업무 내용)을 입력해주세요.");
+
+  const result = await env.DB.prepare(
+    `INSERT INTO site_schedules (site_name, category, remarks, due_date, amount, fee_note, tag, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+  )
+    .bind(site_name, category, remarks, due_date, amount, fee_note, tag)
+    .run();
+
+  return json({ ok: true, id: result.meta.last_row_id });
+}
+
+async function handleUpdateSchedule(id, request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+
+  const fields = [];
+  const binds = [];
+
+  if (typeof body.site_name === "string") {
+    fields.push("site_name = ?");
+    binds.push(body.site_name.trim());
+  }
+  if (typeof body.category === "string") {
+    fields.push("category = ?");
+    binds.push(body.category.trim());
+  }
+  if (typeof body.remarks === "string") {
+    fields.push("remarks = ?");
+    binds.push(body.remarks.trim());
+  }
+  if (body.due_date !== undefined) {
+    // 만기 도래일은 화면에서 직접 입력/수정 가능(요청사항) — 빈 값이면 "해당없음"으로 NULL 처리.
+    fields.push("due_date = ?");
+    binds.push(body.due_date || null);
+  }
+  if (typeof body.amount === "string") {
+    fields.push("amount = ?");
+    binds.push(body.amount.trim());
+  }
+  if (typeof body.fee_note === "string") {
+    fields.push("fee_note = ?");
+    binds.push(body.fee_note.trim());
+  }
+  if (body.tag !== undefined) {
+    fields.push("tag = ?");
+    binds.push(normalizeScheduleTag(body.tag));
+  }
+
+  if (fields.length === 0) return badRequest("수정할 내용이 없습니다.");
+
+  fields.push("updated_at = datetime('now')");
+  binds.push(id);
+
+  await env.DB.prepare(`UPDATE site_schedules SET ${fields.join(", ")} WHERE id = ?`)
+    .bind(...binds)
+    .run();
+
+  return json({ ok: true });
+}
+
+async function handleDeleteSchedule(id, env) {
+  await env.DB.prepare("DELETE FROM site_schedules WHERE id = ?").bind(id).run();
+  return json({ ok: true });
+}
+
 // ---- 메인 fetch 핸들러 ----
 
 export default {
@@ -1125,6 +1272,20 @@ export default {
       }
       if (workMemoMatch && method === "DELETE") {
         return await handleDeleteWorkMemo(Number(workMemoMatch[1]), env);
+      }
+
+      if (path === "/api/site-schedules" && method === "GET") {
+        return await handleGetSchedules(request, env);
+      }
+      if (path === "/api/site-schedules" && method === "POST") {
+        return await handleCreateSchedule(request, env);
+      }
+      const scheduleMatch = path.match(/^\/api\/site-schedules\/(\d+)$/);
+      if (scheduleMatch && method === "PUT") {
+        return await handleUpdateSchedule(Number(scheduleMatch[1]), request, env);
+      }
+      if (scheduleMatch && method === "DELETE") {
+        return await handleDeleteSchedule(Number(scheduleMatch[1]), env);
       }
 
       return json({ error: "Not Found" }, { status: 404 });
