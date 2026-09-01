@@ -127,7 +127,10 @@ input:focus, select:focus {
 
 /* ---------- 앱 레이아웃 ---------- */
 .app-wrap {
-  max-width: 1400px;
+  /* 상단 탭이 11개로 늘어나면서 1400px 폭에서는 한 줄에 다 들어가지 못해
+     메뉴바를 드래그(가로 스크롤)해야만 전부 볼 수 있었음 → 탭 전체가 드래그 없이
+     한 줄에 들어가도록(및 그 아래 화면 전체도 함께) 폭을 넓힘 */
+  max-width: 1600px;
   margin: 0 auto;
   padding: 20px 16px 60px;
 }
@@ -168,8 +171,10 @@ input:focus, select:focus {
   background: transparent;
   border: none;
   border-radius: 9px;
-  padding: 11px 14px;
-  font-size: 14.5px;
+  /* 탭이 11개로 늘어난 뒤에도 좁은 노트북 화면(1366px 안팎)에서까지 드래그 없이
+     한 줄에 들어가도록 여백/글자 크기를 살짝 줄임 (위 .app-wrap 폭 확대와 함께 적용) */
+  padding: 11px 10px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-muted);
 }
