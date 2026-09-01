@@ -288,6 +288,7 @@ input:focus, select:focus {
 .tag-badge.tag-disinfect { background: #eafbf0; color: #1a7a4c; }
 .tag-badge.tag-tank { background: #e6f7fb; color: #0f7490; }
 .tag-badge.tag-tax { background: #fdf6d8; color: #8a6d1c; }
+.tag-badge.tag-edu { background: #fdeef6; color: #a83f7c; }
 .tag-badge.tag-etc { background: #f1f1f1; color: #5a5a5a; }
 
 .cal-chip.cal-chip-tag-insurance { background: #eef1ff; color: #3444a8; }
@@ -296,6 +297,7 @@ input:focus, select:focus {
 .cal-chip.cal-chip-tag-disinfect { background: #eafbf0; color: #1a7a4c; }
 .cal-chip.cal-chip-tag-tank { background: #e6f7fb; color: #0f7490; }
 .cal-chip.cal-chip-tag-tax { background: #fdf6d8; color: #8a6d1c; }
+.cal-chip.cal-chip-tag-edu { background: #fdeef6; color: #a83f7c; }
 .cal-chip.cal-chip-tag-etc { background: #f1f1f1; color: #5a5a5a; }
 
 .cal-nodue {
@@ -563,6 +565,16 @@ tbody tr.paid-row td { border-bottom: 1px solid var(--paid-row-border); }
    (설비 점검 태그 배경색(주황 계열)과 구분되도록 붉은 계열로 지정) */
 tbody tr.overdue-row { background: #fdeaea; }
 tbody tr.overdue-row td { border-bottom: 1px solid #f4c6c6; }
+
+/* 현장별 1년 스케줄표: 목록 보기의 "월분별 조회" 그룹 구분 헤더 행 */
+#scheduleTable tbody tr.schedule-month-header td {
+  background: #eef1f7;
+  color: var(--navy);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
 
 .col-cost { text-align: right; }
 /* 금액은 줄바꿈되면 행 높이가 들쭉날쭉해지므로 한 줄로 고정합니다. */
@@ -837,6 +849,25 @@ td.site-badge {
   #journalTable td.col-no, #workMemoTable td.col-no, #accountingTable td.col-no, #followupTable td.col-no, #siteAccountsTable td.col-no, #scheduleTable td.col-no { display: none; }
   #recordsTable .edit-input, #journalTable .edit-input, #accountingTable .edit-input, #followupTable .edit-input, #siteAccountsTable .edit-input { width: auto; max-width: 200px; margin-left: auto; }
   #recordsTable select.edit-input, #journalTable select.edit-input, #accountingTable select.edit-input, #followupTable select.edit-input { min-width: 0; }
+
+  /* 현장별 1년 스케줄표: 모바일 카드형 레이아웃에서도 "월분별 조회" 그룹 헤더는
+     일반 행(카드) 스타일이 아니라 얇은 구분 바 형태로 보이도록 재정의합니다. */
+  #scheduleTable tbody tr.schedule-month-header {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    margin: 14px 0 6px;
+    padding: 0;
+  }
+  #scheduleTable tbody tr.schedule-month-header td {
+    display: block;
+    padding: 6px 10px;
+    border-bottom: none;
+  }
+  #scheduleTable tbody tr.schedule-month-header td::before {
+    content: none;
+  }
 
   /* ---------- 히스토리 / 작업내역 조회 / 경리 업무일지 조회: 표 -> 세로 카드 ----------
      가로로 드래그해서 봐야 했던 월/현장별 집계를, 항목을 아래로 쌓아

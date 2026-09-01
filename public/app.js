@@ -311,7 +311,7 @@
   let siteAccountAmounts = new Map(); // id -> 입력 중인 납부금액 문자열(다른 행 수정 등으로 표가 다시 그려져도 유지)
 
   // 현장별 1년 스케줄표 상태
-  const SCHEDULE_TAGS = ["보험", "건물 점검", "설비 점검", "소독", "저수조청소", "세금", "기타"];
+  const SCHEDULE_TAGS = ["📓보험", "🏢 건물 점검", "🛠️설비 점검", "😷소독", "💧저수조청소", "🪙세금", "📖교육", "기타"];
   let scheduleEntries = [];
   let editingScheduleId = null;
   let scheduleView = "list"; // "list" | "calendar"
@@ -512,6 +512,7 @@
       [followupFilterSite, filterOpts],
       [newFollowupSite, pickOpts],
       [overviewFilterSite, filterOpts],
+      [newScheduleSite, pickOpts],
     ];
 
     const prevValues = targets.map(([el]) => el.value);
@@ -3261,20 +3262,24 @@
 
   // ================= 현장별 1년 스케줄표 (보험 만기·법정 점검·소독·저수조청소 등) =================
   // 사용자가 업로드한 "현장별 1년 스케줄표.xlsx"를 초기 데이터로 반영한 화면입니다.
-  // 만기 도래일 기준 오름차순 정렬이 기본이며, 만기 도래일이 없는(해당없음) 항목은
-  // 정렬 순서상 맨 뒤로 보냅니다(서버에서 이미 이렇게 정렬해서 내려줍니다).
+  // 목록 보기는 기본적으로 "월분별 조회"입니다 — 만기 도래일의 연-월로 그룹을 묶어
+  // 월 오름차순으로 표시하고(만기 도래일이 없는 항목은 "만기일 미정" 그룹으로 맨
+  // 뒤에 배치), 같은 월 안에서는 태그 우선순위(보험->건물 점검->설비 점검->소독->
+  // 저수조청소->세금->교육->기타) 순으로 정렬합니다. 이 그룹핑·정렬은 화면(클라이언트)
+  // 에서 수행합니다(renderSchedule 참고).
   // 현장/태그/키워드 필터는 서버에서 전체를 한 번 불러온 뒤 화면(클라이언트)에서
   // 적용합니다 — 이렇게 하면 "현장" 드롭다운이 필터링 중에도 항상 전체 현장 목록을
   // 그대로 유지합니다(서버 필터링 방식이면 현장을 하나 고른 뒤 드롭다운이 그 현장
   // 하나로 좁아져 버리는 문제가 있음).
 
   const SCHEDULE_TAG_CLASS = {
-    "보험": "insurance",
-    "건물 점검": "building",
-    "설비 점검": "equipment",
-    "소독": "disinfect",
-    "저수조청소": "tank",
-    "세금": "tax",
+    "📓보험": "insurance",
+    "🏢 건물 점검": "building",
+    "🛠️설비 점검": "equipment",
+    "😷소독": "disinfect",
+    "💧저수조청소": "tank",
+    "🪙세금": "tax",
+    "📖교육": "edu",
     "기타": "etc",
   };
 
@@ -3290,6 +3295,74 @@
   function scheduleTagBadgeHtml(tag) {
     const cls = SCHEDULE_TAG_CLASS[tag] || "etc";
     return `<span class="tag-badge tag-${cls}">${escapeHtml(tag)}</span>`;
+  }
+
+  // 금액이 순수 숫자 문자열일 때만 천단위 콤마를 붙여 표시. "-", "부과 예정", "금액 정해야함" 같은
+  // 자유 텍스트는 원본 그대로 표시(값 자체는 DB에 원본 그대로 유지, 화면 표시만 가공).
+  // "현장 관리"에 등록된 현장 목록으로 드롭다운을 구성하되, 엑셀에서 가져온 187건 초기
+  // 데이터처럼 현재 값이 등록된 현장 목록에 없는 경우에는 그 값을 그대로 잃지 않도록
+  // 목록 맨 앞에 별도 옵션으로 끼워 넣는다(선택하지 않고 저장해도 다른 현장으로 조용히
+  // 바뀌는 일이 없게 하기 위함).
+  function scheduleSiteEditOptionsHtml(currentValue) {
+    const inList = sites.some((s) => s.name === currentValue);
+    const extra =
+      currentValue && !inList
+        ? `<option value="${escapeHtml(currentValue)}" selected>${escapeHtml(currentValue)} (등록 안 됨)</option>`
+        : "";
+    const opts = sites
+      .map((s) => `<option value="${escapeHtml(s.name)}" ${s.name === currentValue ? "selected" : ""}>${escapeHtml(s.name)}</option>`)
+      .join("");
+    return extra + opts;
+  }
+
+  function formatScheduleAmountHtml(amount) {
+    const raw = (amount == null ? "" : String(amount)).trim();
+    if (!raw) return "-";
+    if (/^-?\d+$/.test(raw)) {
+      return escapeHtml(Number(raw).toLocaleString("ko-KR"));
+    }
+    return escapeHtml(raw);
+  }
+
+  // 태그 인라인 수정 드롭다운도 현장명 드롭다운(scheduleSiteEditOptionsHtml)과 동일한
+  // 이유로 안전장치가 필요합니다: 태그 이름에 이모지를 붙이면서 기존에 저장된 값(예:
+  // 이모지 없는 옛 "보험")이 새 SCHEDULE_TAGS 목록과 더 이상 일치하지 않게 되는데,
+  // 그 상태로 드롭다운을 열고 다른 칸만 고쳐 저장하면 브라우저가 첫 번째 옵션을
+  // 선택된 것으로 취급해 태그가 조용히 바뀌어버립니다. 현재 값이 목록에 없으면
+  // "(이전 태그명)" 옵션을 맨 앞에 끼워 넣어 우선 보존합니다(마이그레이션 실행 전
+  // 과도기 대비용 — 마이그레이션 실행 후에는 모든 값이 새 목록과 일치해 이 옵션은
+  // 나타나지 않습니다).
+  function scheduleTagEditOptionsHtml(currentValue) {
+    const inList = SCHEDULE_TAGS.includes(currentValue);
+    const extra =
+      currentValue && !inList
+        ? `<option value="${escapeHtml(currentValue)}" selected>${escapeHtml(currentValue)} (이전 태그명)</option>`
+        : "";
+    const opts = SCHEDULE_TAGS
+      .map((t) => `<option value="${escapeHtml(t)}" ${t === currentValue ? "selected" : ""}>${escapeHtml(t)}</option>`)
+      .join("");
+    return extra + opts;
+  }
+
+  // 태그 우선순위(월분별 조회 시 같은 달 안에서의 정렬 기준): SCHEDULE_TAGS 배열의
+  // 순서를 그대로 우선순위로 사용합니다(보험->건물 점검->설비 점검->소독->저수조청소->
+  // 세금->교육->기타). 목록에 없는(마이그레이션 전 과도기의 옛 이름) 값은 "기타"와
+  // 같은 맨 뒤 순위로 취급합니다.
+  function scheduleTagSortIndex(tag) {
+    const idx = SCHEDULE_TAGS.indexOf(tag);
+    return idx === -1 ? SCHEDULE_TAGS.length : idx;
+  }
+
+  // 월분별 그룹핑 키(만기 도래일의 연-월, 예: "2026-09"). 만기 도래일이 없는 항목은
+  // 빈 문자열 키로 묶어 "만기일 미정" 그룹으로 맨 뒤에 표시합니다.
+  function scheduleMonthKey(dueDate) {
+    return dueDate ? dueDate.slice(0, 7) : "";
+  }
+
+  function scheduleMonthLabel(key) {
+    if (!key) return "만기일 미정";
+    const [y, m] = key.split("-");
+    return `${y}년 ${Number(m)}월`;
   }
 
   let scheduleAllEntries = []; // 필터 적용 전, 서버에서 받은 전체 목록(만기 도래일 오름차순)
@@ -3360,7 +3433,7 @@
 
   saveScheduleBtn.addEventListener("click", async () => {
     scheduleAddError.textContent = "";
-    if (!newScheduleSite.value.trim()) { scheduleAddError.textContent = "현장명을 입력해주세요."; return; }
+    if (!newScheduleSite.value) { scheduleAddError.textContent = "현장을 선택해주세요."; return; }
     if (!newScheduleCategory.value.trim()) { scheduleAddError.textContent = "구분(업무 내용)을 입력해주세요."; return; }
     try {
       await api("/api/site-schedules", {
@@ -3394,9 +3467,45 @@
       return;
     }
     scheduleEmptyMsg.classList.add("hidden");
-    scheduleBody.innerHTML = scheduleEntries
-      .map((r, i) => (editingScheduleId === r.id ? scheduleEditRowHtml(r, i) : scheduleViewRowHtml(r, i)))
-      .join("");
+
+    // 월분별 그룹핑: 만기 도래일의 연-월 기준으로 묶습니다.
+    const groups = new Map();
+    scheduleEntries.forEach((r) => {
+      const key = scheduleMonthKey(r.due_date);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    });
+    // 월 그룹 순서: 연-월 문자열("YYYY-MM")은 그대로 사전식 정렬해도 시간순과 일치하므로
+    // localeCompare로 오름차순 정렬하고, 만기일 미정 그룹("")은 항상 맨 뒤로 보냅니다.
+    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+      if (a === b) return 0;
+      if (a === "") return 1;
+      if (b === "") return -1;
+      return a < b ? -1 : 1;
+    });
+    // 같은 월 안에서는 태그 우선순위 -> 만기 도래일(일자) -> id 순으로 정렬합니다.
+    sortedKeys.forEach((key) => {
+      groups.get(key).sort((a, b) => {
+        const ta = scheduleTagSortIndex(a.tag);
+        const tb = scheduleTagSortIndex(b.tag);
+        if (ta !== tb) return ta - tb;
+        const da = a.due_date || "";
+        const db = b.due_date || "";
+        if (da !== db) return da < db ? -1 : 1;
+        return a.id - b.id;
+      });
+    });
+
+    let i = 0;
+    const parts = [];
+    sortedKeys.forEach((key) => {
+      parts.push(`<tr class="schedule-month-header"><td colspan="9">${escapeHtml(scheduleMonthLabel(key))}</td></tr>`);
+      groups.get(key).forEach((r) => {
+        parts.push(editingScheduleId === r.id ? scheduleEditRowHtml(r, i) : scheduleViewRowHtml(r, i));
+        i++;
+      });
+    });
+    scheduleBody.innerHTML = parts.join("");
   }
 
   function scheduleViewRowHtml(r, i) {
@@ -3408,7 +3517,7 @@
         <td class="content-cell-wide" data-label="구분"><span class="cell-value">${escapeHtml(r.category) || "-"}</span></td>
         <td class="content-cell-wide" data-label="비고"><span class="cell-value">${escapeHtml(r.remarks) || "-"}</span></td>
         <td class="col-date" data-label="만기 도래일"><span class="cell-value">${escapeHtml(r.due_date) || "-"}</span></td>
-        <td data-label="금액"><span class="cell-value">${escapeHtml(r.amount) || "-"}</span></td>
+        <td data-label="금액"><span class="cell-value">${formatScheduleAmountHtml(r.amount)}</span></td>
         <td data-label="관리비 적용"><span class="cell-value">${escapeHtml(r.fee_note) || "-"}</span></td>
         <td data-label="태그"><span class="cell-value">${scheduleTagBadgeHtml(r.tag)}</span></td>
         <td class="col-manage" data-label="관리">
@@ -3421,13 +3530,11 @@
   }
 
   function scheduleEditRowHtml(r, i) {
-    const tagOpts = SCHEDULE_TAGS
-      .map((t) => `<option value="${escapeHtml(t)}" ${t === r.tag ? "selected" : ""}>${escapeHtml(t)}</option>`)
-      .join("");
+    const tagOpts = scheduleTagEditOptionsHtml(r.tag);
     return `
       <tr data-id="${r.id}">
         <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
-        <td data-label="현장명"><input class="edit-input" data-edit="site_name" value="${escapeHtml(r.site_name)}" /></td>
+        <td data-label="현장명"><select class="edit-input" data-edit="site_name">${scheduleSiteEditOptionsHtml(r.site_name)}</select></td>
         <td data-label="구분"><input class="edit-input" data-edit="category" value="${escapeHtml(r.category)}" /></td>
         <td data-label="비고"><input class="edit-input" data-edit="remarks" value="${escapeHtml(r.remarks)}" /></td>
         <td class="col-date" data-label="만기 도래일"><input class="edit-input" type="date" data-edit="due_date" value="${r.due_date || ""}" /></td>
