@@ -311,7 +311,7 @@
   let siteAccountAmounts = new Map(); // id -> 입력 중인 납부금액 문자열(다른 행 수정 등으로 표가 다시 그려져도 유지)
 
   // 현장별 1년 스케줄표 상태
-  const SCHEDULE_TAGS = ["보험", "건물 점검", "설비 점검", "소독", "저수조청소", "기타"];
+  const SCHEDULE_TAGS = ["보험", "건물 점검", "설비 점검", "소독", "저수조청소", "세금", "기타"];
   let scheduleEntries = [];
   let editingScheduleId = null;
   let scheduleView = "list"; // "list" | "calendar"
@@ -3274,6 +3274,7 @@
     "설비 점검": "equipment",
     "소독": "disinfect",
     "저수조청소": "tank",
+    "세금": "tax",
     "기타": "etc",
   };
 
