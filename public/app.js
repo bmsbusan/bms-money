@@ -3600,7 +3600,6 @@
   function scheduleTxtItemLine(r, i) {
     const parts = [r.site_name];
     if (r.category) parts.push(r.category);
-    if (r.remarks) parts.push(r.remarks);
     return `${i + 1}. ${parts.join("-")}`;
   }
 
