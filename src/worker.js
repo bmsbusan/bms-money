@@ -17,7 +17,7 @@ const ALLOWED_CATEGORIES = ["작업내역", "소독", "저수조청소"];
 const DEFAULT_CATEGORY = "작업내역";
 
 // 현장별 1년 스케줄표 태그 종류
-const SCHEDULE_TAGS = ["보험", "건물 점검", "설비 점검", "소독", "저수조청소", "기타"];
+const SCHEDULE_TAGS = ["보험", "건물 점검", "설비 점검", "소독", "저수조청소", "세금", "기타"];
 const DEFAULT_SCHEDULE_TAG = "기타";
 
 function json(data, init = {}) {
