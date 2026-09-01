@@ -3627,10 +3627,10 @@
           });
         if (items.length === 0) return null;
         const lines = items.map((r, i) => scheduleTxtItemLine(r, i)).join("\n");
-        return `${tag}\n\n${lines}`;
+        return `${tag}\n${lines}`;
       })
       .filter(Boolean);
-    const text = `[${scheduleMonthLabel(monthValue)}]\n\n${sections.join("\n\n\n")}\n`;
+    const text = `[${scheduleMonthLabel(monthValue)}]\n\n${sections.join("\n\n")}\n`;
     downloadTextBlob(text, `현장별_1년_스케줄표_${monthValue}.txt`);
   });
 
