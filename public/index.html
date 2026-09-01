@@ -61,6 +61,7 @@
       <button class="tab-btn" data-tab="followup">후속 작업</button>
       <button class="tab-btn" data-tab="siteAccounts">현장별 계좌번호 정리</button>
       <button class="tab-btn" data-tab="siteSchedules">현장별 1년 스케줄표</button>
+      <button class="tab-btn" data-tab="siteRules">관리규약</button>
     </nav>
 
     <div id="listSection">
@@ -736,6 +737,34 @@
           <p id="scheduleCalDetailEmpty" class="empty-msg hidden">이 날짜가 만기 도래일인 일정이 없습니다.</p>
         </section>
       </section>
+    </div>
+
+    <!-- 현장별 관리규약 -->
+    <div id="siteRulesSection" class="hidden">
+      <section class="toolbar">
+        <div class="filters site-rules-upload-group">
+          <select id="ruleUploadSite">
+            <option value="">현장 선택</option>
+          </select>
+          <input id="ruleUploadFile" type="file" />
+          <button id="ruleUploadBtn" class="btn btn-primary">업로드</button>
+        </div>
+      </section>
+      <p id="ruleUploadError" class="error-msg"></p>
+
+      <section class="table-wrap">
+        <table id="siteRulesTable">
+          <thead>
+            <tr>
+              <th class="col-site">현장</th>
+              <th class="col-date">최신 개정일</th>
+              <th class="col-manage">다운로드</th>
+            </tr>
+          </thead>
+          <tbody id="siteRulesBody"></tbody>
+        </table>
+      </section>
+      <p id="siteRulesEmptyMsg" class="empty-msg hidden">등록된 현장이 없습니다. 상단에서 "현장 관리"로 현장을 먼저 등록해주세요.</p>
     </div>
   </div>
 

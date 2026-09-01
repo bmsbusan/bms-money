@@ -1141,6 +1141,116 @@ async function handleDeleteSchedule(id, env) {
   return json({ ok: true });
 }
 
+// ---- 현장별 관리규약 (site_rules) ----
+// 현장별로 관리규약 파일(형식 제한 없음)을 업로드/다운로드할 수 있는 화면입니다.
+// 파일 실물은 R2 버킷(RULES_BUCKET)에 저장하고, D1(site_rules)에는 현장명을 키로
+// 파일명/최신 개정일 등 메타데이터만 보관합니다(현장당 파일 1개 — 재업로드 시 덮어씀).
+
+function siteRuleKey(siteName) {
+  return `site-rules/${encodeURIComponent(siteName)}`;
+}
+
+function rowToSiteRule(row) {
+  return {
+    site_name: row.site_name,
+    filename: row.filename || "",
+    revision_date: row.revision_date || null,
+    uploaded_at: row.uploaded_at || null,
+  };
+}
+
+async function handleGetSiteRules(env) {
+  const { results } = await env.DB.prepare("SELECT * FROM site_rules").all();
+  return json({ entries: results.map(rowToSiteRule) });
+}
+
+async function handleUploadSiteRule(request, env) {
+  if (!env.RULES_BUCKET) {
+    return json(
+      { error: "파일 저장소(R2)가 설정되어 있지 않습니다. wrangler.toml의 R2 버킷 설정을 확인해주세요." },
+      { status: 500 }
+    );
+  }
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return badRequest("요청 형식이 올바르지 않습니다.");
+  }
+  const siteNameRaw = formData.get("site_name");
+  const site_name = typeof siteNameRaw === "string" ? siteNameRaw.trim() : "";
+  const file = formData.get("file");
+  if (!site_name) return badRequest("현장을 선택해주세요.");
+  if (!(file instanceof File) || file.size === 0) return badRequest("업로드할 파일을 선택해주세요.");
+
+  const siteRow = await env.DB.prepare("SELECT id FROM sites WHERE name = ?").bind(site_name).first();
+  if (!siteRow) return badRequest("등록되지 않은 현장입니다.");
+
+  const key = siteRuleKey(site_name);
+  await env.RULES_BUCKET.put(key, file.stream(), {
+    httpMetadata: { contentType: file.type || "application/octet-stream" },
+  });
+
+  await env.DB.prepare(
+    `INSERT INTO site_rules (site_name, filename, r2_key, uploaded_at, updated_at)
+     VALUES (?, ?, ?, datetime('now'), datetime('now'))
+     ON CONFLICT(site_name) DO UPDATE SET
+       filename = excluded.filename,
+       r2_key = excluded.r2_key,
+       uploaded_at = excluded.uploaded_at,
+       updated_at = excluded.updated_at`
+  )
+    .bind(site_name, file.name || "관리규약", key)
+    .run();
+
+  return json({ ok: true });
+}
+
+async function handleUpdateSiteRule(request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+  const site_name = typeof body.site_name === "string" ? body.site_name.trim() : "";
+  if (!site_name) return badRequest("현장을 선택해주세요.");
+  const revision_date = typeof body.revision_date === "string" && body.revision_date ? body.revision_date : null;
+
+  const siteRow = await env.DB.prepare("SELECT id FROM sites WHERE name = ?").bind(site_name).first();
+  if (!siteRow) return badRequest("등록되지 않은 현장입니다.");
+
+  await env.DB.prepare(
+    `INSERT INTO site_rules (site_name, revision_date, updated_at)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(site_name) DO UPDATE SET
+       revision_date = excluded.revision_date,
+       updated_at = excluded.updated_at`
+  )
+    .bind(site_name, revision_date)
+    .run();
+
+  return json({ ok: true });
+}
+
+async function handleDownloadSiteRule(siteName, env) {
+  if (!env.RULES_BUCKET) {
+    return json({ error: "파일 저장소(R2)가 설정되어 있지 않습니다." }, { status: 500 });
+  }
+  const row = await env.DB.prepare("SELECT filename, r2_key FROM site_rules WHERE site_name = ?")
+    .bind(siteName)
+    .first();
+  if (!row || !row.r2_key) return json({ error: "등록된 관리규약 파일이 없습니다." }, { status: 404 });
+
+  const obj = await env.RULES_BUCKET.get(row.r2_key);
+  if (!obj) return json({ error: "파일을 찾을 수 없습니다." }, { status: 404 });
+
+  const filename = row.filename || "관리규약";
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  headers.set(
+    "Content-Disposition",
+    `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(filename)}`
+  );
+  return new Response(obj.body, { headers });
+}
+
 // ---- 메인 fetch 핸들러 ----
 
 export default {
@@ -1286,6 +1396,20 @@ export default {
       }
       if (scheduleMatch && method === "DELETE") {
         return await handleDeleteSchedule(Number(scheduleMatch[1]), env);
+      }
+
+      if (path === "/api/site-rules" && method === "GET") {
+        return await handleGetSiteRules(env);
+      }
+      if (path === "/api/site-rules" && method === "POST") {
+        return await handleUploadSiteRule(request, env);
+      }
+      if (path === "/api/site-rules" && method === "PUT") {
+        return await handleUpdateSiteRule(request, env);
+      }
+      const siteRuleDownloadMatch = path.match(/^\/api\/site-rules\/([^/]+)\/file$/);
+      if (siteRuleDownloadMatch && method === "GET") {
+        return await handleDownloadSiteRule(decodeURIComponent(siteRuleDownloadMatch[1]), env);
       }
 
       return json({ error: "Not Found" }, { status: 404 });

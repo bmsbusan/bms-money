@@ -72,6 +72,14 @@ button {
 .btn-success { background: var(--good-text); color: #fff; }
 .btn-success:hover { background: var(--good-text); }
 .btn-sm { padding: 6px 12px; font-size: 12.5px; border-radius: 8px; }
+/* 관리규약 탭: 파일이 아직 등록되지 않은 현장의 "다운로드" 자리에 표시하는 비활성 배지 */
+.btn-disabled {
+  display: inline-flex;
+  background: var(--surface-soft);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  cursor: not-allowed;
+}
 
 input[type="text"], input[type="number"], input[type="password"], input[type="date"], select {
   font-family: inherit;
@@ -152,29 +160,29 @@ input:focus, select:focus {
 .brand-company { font-size: 13.5px; font-weight: 700; color: var(--primary); }
 .brand-app { font-size: 23px; font-weight: 800; color: var(--text); letter-spacing: -0.03em; }
 
-/* 상단 탭: 흰 바탕 위에 활성 탭만 남색으로 채워지는 형태 */
+/* 상단 탭: 흰 바탕 위에 활성 탭만 남색으로 채워지는 형태
+   탭이 13개로 늘어나면서 한 줄에 다 넣으면 글자를 계속 줄여야 하는 문제가 있어,
+   2줄(7개+6개)로 배치하고 대신 글자를 더 크게 키웠습니다. 열 개수(7)는 현재 탭
+   13개 기준(ceil(13/2))이므로, 탭이 추가/삭제되어 개수가 바뀌면 이 값도 함께
+   조정해야 정확히 2줄로 맞습니다. */
 .tab-bar {
-  display: flex;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
   margin-bottom: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 5px;
+  padding: 6px;
   box-shadow: var(--shadow);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 .tab-btn {
-  flex: 1 1 0;
   white-space: nowrap;
   background: transparent;
   border: none;
   border-radius: 9px;
-  /* 탭이 11개로 늘어난 뒤에도 좁은 노트북 화면(1366px 안팎)에서까지 드래그 없이
-     한 줄에 들어가도록 여백/글자 크기를 살짝 줄임 (위 .app-wrap 폭 확대와 함께 적용) */
-  padding: 11px 10px;
-  font-size: 13.5px;
+  padding: 13px 12px;
+  font-size: 15.5px;
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -378,6 +386,9 @@ input:focus, select:focus {
   margin-bottom: 12px;
 }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+/* 관리규약 탭: 업로드 컨트롤을 툴바 우측(우상단)에 배치합니다(별도 필터가 없어
+   .toolbar의 space-between만으로는 왼쪽에 붙어버리는 문제를 margin-left:auto로 보정). */
+.site-rules-upload-group { margin-left: auto; }
 
 .add-form {
   background: var(--surface);
@@ -720,7 +731,7 @@ td.site-badge {
   .card-value { font-size: 24px; }
 
   /* ---------- 상단 탭: 가로로 드래그하지 않고 여러 줄로 나눠서 표시 ----------
-     탭이 9개라 3개씩 정확히 3줄로 맞춰집니다. */
+     3개씩 자동으로 줄바꿈됩니다(탭 개수가 늘어나면 줄 수만 자동으로 늘어남). */
   .tab-bar {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -752,8 +763,8 @@ td.site-badge {
     border-radius: 0;
     box-shadow: none;
   }
-  #recordsTable, #journalTable, #workMemoTable, #accountingTable, #followupTable, #overviewSearchTable, #acctOverviewSearchTable, #siteAccountsTable, #scheduleTable { min-width: 0; width: 100%; }
-  #recordsTable thead, #journalTable thead, #workMemoTable thead, #accountingTable thead, #followupTable thead, #overviewSearchTable thead, #acctOverviewSearchTable thead, #siteAccountsTable thead, #scheduleTable thead { display: none; }
+  #recordsTable, #journalTable, #workMemoTable, #accountingTable, #followupTable, #overviewSearchTable, #acctOverviewSearchTable, #siteAccountsTable, #scheduleTable, #siteRulesTable { min-width: 0; width: 100%; }
+  #recordsTable thead, #journalTable thead, #workMemoTable thead, #accountingTable thead, #followupTable thead, #overviewSearchTable thead, #acctOverviewSearchTable thead, #siteAccountsTable thead, #scheduleTable thead, #siteRulesTable thead { display: none; }
   #recordsTable, #recordsTable tbody, #recordsTable tr, #recordsTable td,
   #journalTable, #journalTable tbody, #journalTable tr, #journalTable td,
   #workMemoTable, #workMemoTable tbody, #workMemoTable tr, #workMemoTable td,
@@ -762,11 +773,12 @@ td.site-badge {
   #overviewSearchTable, #overviewSearchTable tbody, #overviewSearchTable tr, #overviewSearchTable td,
   #acctOverviewSearchTable, #acctOverviewSearchTable tbody, #acctOverviewSearchTable tr, #acctOverviewSearchTable td,
   #siteAccountsTable, #siteAccountsTable tbody, #siteAccountsTable tr, #siteAccountsTable td,
-  #scheduleTable, #scheduleTable tbody, #scheduleTable tr, #scheduleTable td {
+  #scheduleTable, #scheduleTable tbody, #scheduleTable tr, #scheduleTable td,
+  #siteRulesTable, #siteRulesTable tbody, #siteRulesTable tr, #siteRulesTable td {
     display: block;
     width: 100%;
   }
-  #recordsTable tbody tr, #journalTable tbody tr, #workMemoTable tbody tr, #accountingTable tbody tr, #followupTable tbody tr, #overviewSearchTable tbody tr, #acctOverviewSearchTable tbody tr, #siteAccountsTable tbody tr, #scheduleTable tbody tr {
+  #recordsTable tbody tr, #journalTable tbody tr, #workMemoTable tbody tr, #accountingTable tbody tr, #followupTable tbody tr, #overviewSearchTable tbody tr, #acctOverviewSearchTable tbody tr, #siteAccountsTable tbody tr, #scheduleTable tbody tr, #siteRulesTable tbody tr {
     /* 위쪽의 일괄 width:100% 규칙 + 아래 margin 이 합쳐지면 카드가 좌우로
        margin 만큼 컨테이너 밖으로 삐져나가므로 width 를 auto 로 되돌립니다. */
     width: auto;
@@ -780,7 +792,7 @@ td.site-badge {
   }
   #recordsTable tbody tr.paid-row, #followupTable tbody tr.paid-row, #acctOverviewSearchTable tbody tr.paid-row, #workMemoTable tbody tr.paid-row { border-color: var(--paid-row-border); }
   #followupTable tbody tr.overdue-row, #scheduleTable tbody tr.overdue-row { border-color: #f4c6c6; }
-  #recordsTable tbody td, #journalTable tbody td, #workMemoTable tbody td, #accountingTable tbody td, #followupTable tbody td, #overviewSearchTable tbody td, #acctOverviewSearchTable tbody td, #siteAccountsTable tbody td, #scheduleTable tbody td {
+  #recordsTable tbody td, #journalTable tbody td, #workMemoTable tbody td, #accountingTable tbody td, #followupTable tbody td, #overviewSearchTable tbody td, #acctOverviewSearchTable tbody td, #siteAccountsTable tbody td, #scheduleTable tbody td, #siteRulesTable tbody td {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -797,8 +809,9 @@ td.site-badge {
   #overviewSearchTable tbody tr td:last-child,
   #acctOverviewSearchTable tbody tr td:last-child,
   #siteAccountsTable tbody tr td:last-child,
-  #scheduleTable tbody tr td:last-child { border-bottom: none; }
-  #recordsTable tbody td::before, #journalTable tbody td::before, #workMemoTable tbody td::before, #accountingTable tbody td::before, #followupTable tbody td::before, #overviewSearchTable tbody td::before, #acctOverviewSearchTable tbody td::before, #siteAccountsTable tbody td::before, #scheduleTable tbody td::before {
+  #scheduleTable tbody tr td:last-child,
+  #siteRulesTable tbody tr td:last-child { border-bottom: none; }
+  #recordsTable tbody td::before, #journalTable tbody td::before, #workMemoTable tbody td::before, #accountingTable tbody td::before, #followupTable tbody td::before, #overviewSearchTable tbody td::before, #acctOverviewSearchTable tbody td::before, #siteAccountsTable tbody td::before, #scheduleTable tbody td::before, #siteRulesTable tbody td::before {
     content: attr(data-label);
     font-size: 12px;
     font-weight: 700;
@@ -816,14 +829,15 @@ td.site-badge {
   #overviewSearchTable tbody td > .cell-value,
   #acctOverviewSearchTable tbody td > .cell-value,
   #siteAccountsTable tbody td > .cell-value,
-  #scheduleTable tbody td > .cell-value {
+  #scheduleTable tbody td > .cell-value,
+  #siteRulesTable tbody td > .cell-value {
     flex: 1 1 auto;
     min-width: 0;
     text-align: right;
     overflow-wrap: break-word;
     word-break: keep-all;
   }
-  #recordsTable td.site-badge, #journalTable td.site-badge, #workMemoTable td.site-badge, #accountingTable td.site-badge, #followupTable td.site-badge, #overviewSearchTable td.site-badge, #acctOverviewSearchTable td.site-badge, #siteAccountsTable td.site-badge, #scheduleTable td.site-badge {
+  #recordsTable td.site-badge, #journalTable td.site-badge, #workMemoTable td.site-badge, #accountingTable td.site-badge, #followupTable td.site-badge, #overviewSearchTable td.site-badge, #acctOverviewSearchTable td.site-badge, #siteAccountsTable td.site-badge, #scheduleTable td.site-badge, #siteRulesTable td.site-badge {
     font-size: 16px;
     color: var(--navy);
   }
@@ -841,10 +855,10 @@ td.site-badge {
     text-overflow: initial;
     white-space: normal;
   }
-  #recordsTable td.col-manage::before, #journalTable td.col-manage::before, #workMemoTable td.col-manage::before, #accountingTable td.col-manage::before, #followupTable td.col-manage::before, #siteAccountsTable td.col-manage::before, #scheduleTable td.col-manage::before {
+  #recordsTable td.col-manage::before, #journalTable td.col-manage::before, #workMemoTable td.col-manage::before, #accountingTable td.col-manage::before, #followupTable td.col-manage::before, #siteAccountsTable td.col-manage::before, #scheduleTable td.col-manage::before, #siteRulesTable td.col-manage::before {
     content: none;
   }
-  #recordsTable td.col-manage, #journalTable td.col-manage, #workMemoTable td.col-manage, #accountingTable td.col-manage, #followupTable td.col-manage, #siteAccountsTable td.col-manage, #scheduleTable td.col-manage { justify-content: flex-end; }
+  #recordsTable td.col-manage, #journalTable td.col-manage, #workMemoTable td.col-manage, #accountingTable td.col-manage, #followupTable td.col-manage, #siteAccountsTable td.col-manage, #scheduleTable td.col-manage, #siteRulesTable td.col-manage { justify-content: flex-end; }
   /* No. 열은 카드형 레이아웃에서는 순서가 위->아래로 이미 드러나므로 굳이 표시하지 않습니다. */
   #journalTable td.col-no, #workMemoTable td.col-no, #accountingTable td.col-no, #followupTable td.col-no, #siteAccountsTable td.col-no, #scheduleTable td.col-no { display: none; }
   #recordsTable .edit-input, #journalTable .edit-input, #accountingTable .edit-input, #followupTable .edit-input, #siteAccountsTable .edit-input { width: auto; max-width: 200px; margin-left: auto; }

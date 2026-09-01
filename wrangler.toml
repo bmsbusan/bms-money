@@ -14,3 +14,11 @@ binding = "ASSETS"
 binding = "DB"
 database_name = "bms-money-db"
 database_id = "34677038-d8a8-432f-a81e-3044c909d9b8"
+
+# R2 버킷 연결 설정입니다("관리규약" 탭에서 업로드하는 파일 실물 저장용).
+# Cloudflare 대시보드 -> R2 -> "Create bucket"에서 아래 bucket_name과 정확히 같은
+# 이름으로 버킷을 먼저 만들어야 합니다(버킷 이름이 다르면 이 줄의 bucket_name 값을
+# 실제로 만든 이름으로 맞춰주세요).
+[[r2_buckets]]
+binding = "RULES_BUCKET"
+bucket_name = "bms-money-site-rules"

@@ -5,6 +5,17 @@ CREATE TABLE IF NOT EXISTS sites (
   sort_order INTEGER NOT NULL DEFAULT 0
 );
 
+-- 현장별 관리규약 파일 메타데이터 (파일 실물은 R2 버킷(RULES_BUCKET)에 저장,
+-- 여기는 현장명 기준으로 파일명/최신 개정일만 보관 — 현장당 파일 1개, 재업로드 시 덮어씀)
+CREATE TABLE IF NOT EXISTS site_rules (
+  site_name TEXT PRIMARY KEY,
+  filename TEXT DEFAULT '',
+  r2_key TEXT DEFAULT '',
+  revision_date TEXT,               -- 관리규약 최신 개정일 YYYY-MM-DD (직접 입력 가능)
+  uploaded_at TEXT,
+  updated_at TEXT
+);
+
 -- 청구/입금 내역 테이블
 CREATE TABLE IF NOT EXISTS records (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

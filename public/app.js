@@ -240,6 +240,15 @@
   const downloadScheduleTxtBtn = $("#downloadScheduleTxtBtn");
   const scheduleExportError = $("#scheduleExportError");
 
+  // ---------- 현장별 관리규약 화면 요소 ----------
+  const siteRulesSection = $("#siteRulesSection");
+  const ruleUploadSite = $("#ruleUploadSite");
+  const ruleUploadFile = $("#ruleUploadFile");
+  const ruleUploadBtn = $("#ruleUploadBtn");
+  const ruleUploadError = $("#ruleUploadError");
+  const siteRulesBody = $("#siteRulesBody");
+  const siteRulesEmptyMsg = $("#siteRulesEmptyMsg");
+
   // ---------- 작업내역 조회 화면 요소 ----------
   const overviewSection = $("#overviewSection");
   const overviewModeMonthBtn = $("#overviewModeMonthBtn");
@@ -390,6 +399,7 @@
       overview: overviewSection,
       siteAccounts: siteAccountsSection,
       siteSchedules: siteSchedulesSection,
+      siteRules: siteRulesSection,
     };
     listSection.classList.toggle("hidden", !CATEGORIES.includes(tab));
     Object.entries(sectionsByTab).forEach(([key, el]) => {
@@ -414,6 +424,8 @@
       loadSiteAccounts();
     } else if (tab === "siteSchedules") {
       loadSchedules();
+    } else if (tab === "siteRules") {
+      loadSiteRules();
     } else {
       loadRecords();
     }
@@ -467,6 +479,9 @@
     } else if (activeTab === "siteSchedules") {
       // 이 탭도 업체명·비고 등 텍스트를 드래그해서 복사하는 경우가 많을 것으로 보여
       // (현장별 계좌번호 정리 탭과 같은 이유로) 5초 자동 새로고침 대상에서 제외합니다.
+    } else if (activeTab === "siteRules") {
+      // 개정일 입력·파일 업로드 도중 표가 통째로 다시 그려지면 끊길 수 있어
+      // (현장별 계좌번호 정리 탭과 같은 이유로) 5초 자동 새로고침 대상에서 제외합니다.
     } else {
       if (editingId === null) loadRecords();
     }
@@ -516,6 +531,7 @@
       [newFollowupSite, pickOpts],
       [overviewFilterSite, filterOpts],
       [newScheduleSite, pickOpts],
+      [ruleUploadSite, pickOpts],
     ];
 
     const prevValues = targets.map(([el]) => el.value);
@@ -3788,6 +3804,88 @@
     scheduleAddForm.classList.remove("hidden");
     scheduleAddError.textContent = "";
     newScheduleDue.value = scheduleCalSelectedDate || "";
+  });
+
+  // ================= 현장별 관리규약 (파일 업로드/다운로드) =================
+  // 현장별로 관리규약 파일(형식 제한 없음)을 업로드하면, 목록에는 등록된 모든 현장이
+  // "현장 관리"의 가나다순 그대로 나열되고, 각 행의 최신 개정일은 언제든 직접 입력해
+  // 바꿀 수 있으며, 다운로드 버튼은 파일이 등록된 현장에서만 활성화됩니다.
+
+  let siteRules = []; // 서버에서 받은 site_rules 목록(파일이 등록된 현장만 항목이 있음)
+
+  async function loadSiteRules() {
+    const data = await api("/api/site-rules");
+    siteRules = data.entries;
+    renderSiteRules();
+  }
+
+  function renderSiteRules() {
+    if (sites.length === 0) {
+      siteRulesBody.innerHTML = "";
+      siteRulesEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    siteRulesEmptyMsg.classList.add("hidden");
+    const byName = new Map(siteRules.map((r) => [r.site_name, r]));
+    siteRulesBody.innerHTML = sites
+      .map((s) => {
+        const rule = byName.get(s.name);
+        const revisionDate = rule?.revision_date || "";
+        const downloadCell = rule?.filename
+          ? `<a class="btn btn-ghost btn-sm" href="/api/site-rules/${encodeURIComponent(s.name)}/file" target="_blank" rel="noopener">다운로드</a>`
+          : `<span class="btn btn-sm btn-disabled">미등록</span>`;
+        return `
+          <tr data-site="${escapeHtml(s.name)}">
+            <td class="site-badge" data-label="현장"><span class="cell-value">${escapeHtml(s.name)}</span></td>
+            <td class="col-date" data-label="최신 개정일"><input class="edit-input rule-revision-input" type="date" data-site="${escapeHtml(s.name)}" value="${revisionDate}" /></td>
+            <td class="col-manage" data-label="다운로드"><span class="cell-value">${downloadCell}</span></td>
+          </tr>`;
+      })
+      .join("");
+  }
+
+  siteRulesBody.addEventListener("change", async (e) => {
+    const input = e.target.closest(".rule-revision-input");
+    if (!input) return;
+    const site_name = input.getAttribute("data-site");
+    try {
+      await api("/api/site-rules", {
+        method: "PUT",
+        body: JSON.stringify({ site_name, revision_date: input.value || null }),
+      });
+      const rule = siteRules.find((r) => r.site_name === site_name);
+      if (rule) rule.revision_date = input.value || null;
+      else siteRules.push({ site_name, filename: "", revision_date: input.value || null, uploaded_at: null });
+    } catch (err) {
+      alert(err.message);
+      renderSiteRules(); // 실패 시 원래 값으로 되돌림
+    }
+  });
+
+  ruleUploadBtn.addEventListener("click", async () => {
+    ruleUploadError.textContent = "";
+    if (!ruleUploadSite.value) { ruleUploadError.textContent = "현장을 선택해주세요."; return; }
+    const file = ruleUploadFile.files[0];
+    if (!file) { ruleUploadError.textContent = "업로드할 파일을 선택해주세요."; return; }
+    const formData = new FormData();
+    formData.append("site_name", ruleUploadSite.value);
+    formData.append("file", file);
+    ruleUploadBtn.disabled = true;
+    const originalLabel = ruleUploadBtn.textContent;
+    ruleUploadBtn.textContent = "업로드 중...";
+    try {
+      const res = await fetch("/api/site-rules", { method: "POST", body: formData, credentials: "same-origin" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "업로드에 실패했습니다.");
+      ruleUploadSite.value = "";
+      ruleUploadFile.value = "";
+      await loadSiteRules();
+    } catch (err) {
+      ruleUploadError.textContent = err.message;
+    } finally {
+      ruleUploadBtn.disabled = false;
+      ruleUploadBtn.textContent = originalLabel;
+    }
   });
 
   // ---------- 상태 토글 버튼 (품의/입금/완료) 공통 렌더링 ----------
