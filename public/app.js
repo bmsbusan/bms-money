@@ -1568,8 +1568,9 @@
     if (!accountingFilterDate.value) params.set("hideOldDone", "1");
     const data = await api(`/api/accounting?${params.toString()}`);
     accountingEntries = data.entries;
-    // 새 업무를 추가해도 항상 현장명 가나다순으로 보이도록 정렬합니다.
-    accountingEntries.sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
+    // 완료된 업무가 항상 목록 맨 위로 오도록 정렬하고, 완료 여부가 같으면
+    // 그 안에서는 현장명 가나다순으로 보이도록 정렬합니다.
+    accountingEntries.sort((a, b) => (b.done ? 1 : 0) - (a.done ? 1 : 0) || a.site_name.localeCompare(b.site_name, "ko"));
     renderAccounting();
     // 날짜를 특정하지 않았을 때는 지난 날짜의 "완료" 건이 자동으로 숨겨져 있다는 걸 안내하고,
     // 특정 날짜를 선택했을 때는 이월된 건도 원래 작성일 기준으로 함께 보이고 있음을 안내합니다.
@@ -1901,7 +1902,11 @@
       // "후속 작업" 탭과 번호가 어긋나지 않도록, 화면과 동일하게 현장명 가나다순으로 정렬합니다.
       const followupItems = (followupData.followups || []).slice()
         .sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
-      const wb = await buildAccountingWorkbook(date, data.entries || [], followupItems);
+      // 화면과 동일하게, 완료된 업무가 위로 오도록 정렬한 뒤(완료 여부가 같으면 현장명 가나다순)
+      // 엑셀의 No. 번호도 이 정렬된 순서를 그대로 따르게 합니다.
+      const entries = (data.entries || []).slice()
+        .sort((a, b) => (b.done ? 1 : 0) - (a.done ? 1 : 0) || a.site_name.localeCompare(b.site_name, "ko"));
+      const wb = await buildAccountingWorkbook(date, entries, followupItems);
       await xlsDownloadBlob(wb, `일일업무일지_${date}.xlsx`);
     } catch (err) {
       accountingExportError.textContent = err.message;
