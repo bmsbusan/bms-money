@@ -60,6 +60,7 @@
       <button class="tab-btn" data-tab="accountingOverview">경리 업무일지 조회</button>
       <button class="tab-btn" data-tab="followup">후속 작업</button>
       <button class="tab-btn" data-tab="siteAccounts">현장별 계좌번호 정리</button>
+      <button class="tab-btn" data-tab="siteSchedules">현장별 1년 스케줄표</button>
     </nav>
 
     <div id="listSection">
@@ -628,6 +629,101 @@
           <tbody id="siteAccountsBody"></tbody>
         </table>
         <p id="siteAccountsEmptyMsg" class="empty-msg hidden">등록된 계좌 정보가 없습니다. "+ 새 계좌 추가"로 등록해주세요.</p>
+      </section>
+    </div>
+
+    <!-- 현장별 1년 스케줄표 (보험 만기·법정 점검·소독·저수조청소 등 반복 일정 관리) -->
+    <div id="siteSchedulesSection" class="hidden">
+      <section class="toolbar">
+        <div class="filters search-filters">
+          <select id="scheduleFilterSite">
+            <option value="">전체 현장</option>
+          </select>
+          <select id="scheduleFilterTag">
+            <option value="">전체 태그</option>
+          </select>
+          <input id="scheduleSearchInput" type="text" placeholder="현장명·구분·비고 검색" />
+          <button id="scheduleSearchResetBtn" class="btn btn-ghost">초기화</button>
+        </div>
+        <button id="addScheduleBtn" class="btn btn-primary">+ 일정 추가</button>
+      </section>
+
+      <section id="scheduleAddForm" class="add-form hidden">
+        <div class="add-form-grid">
+          <input id="newScheduleSite" type="text" placeholder="현장명 입력" />
+          <input id="newScheduleCategory" type="text" placeholder="구분 (예: 승강기안전검사)" />
+          <input id="newScheduleRemarks" type="text" placeholder="비고 입력 (업체명 등)" />
+          <label class="field-label">만기 도래일
+            <input id="newScheduleDue" type="date" />
+          </label>
+          <input id="newScheduleAmount" type="text" placeholder="금액 입력" />
+          <input id="newScheduleFeeNote" type="text" placeholder="관리비 적용 (예: 12개월)" />
+          <select id="newScheduleTag"></select>
+        </div>
+        <div class="add-form-actions">
+          <button id="saveScheduleBtn" class="btn btn-primary">저장</button>
+          <button id="cancelScheduleBtn" class="btn btn-ghost">취소</button>
+        </div>
+        <p id="scheduleAddError" class="error-msg"></p>
+      </section>
+
+      <nav class="subtab-bar">
+        <button id="scheduleViewListBtn" class="subtab-btn subtab-active" data-view="list">목록 보기</button>
+        <button id="scheduleViewCalendarBtn" class="subtab-btn" data-view="calendar">달력 보기</button>
+      </nav>
+
+      <section id="scheduleListView" class="table-wrap">
+        <table id="scheduleTable">
+          <thead>
+            <tr>
+              <th class="col-no">No.</th>
+              <th class="col-site">현장명</th>
+              <th class="col-content-wide">구분</th>
+              <th class="col-remarks">비고</th>
+              <th class="col-date">만기 도래일</th>
+              <th>금액</th>
+              <th>관리비 적용</th>
+              <th>태그</th>
+              <th class="col-manage">관리</th>
+            </tr>
+          </thead>
+          <tbody id="scheduleBody"></tbody>
+        </table>
+        <p id="scheduleEmptyMsg" class="empty-msg hidden">등록된 일정이 없습니다. "+ 일정 추가"로 등록해주세요.</p>
+      </section>
+
+      <section id="scheduleCalendarView" class="calendar-view hidden">
+        <div class="calendar-header">
+          <button id="scheduleCalPrevBtn" class="btn btn-ghost btn-sm" type="button">◀</button>
+          <h3 id="scheduleCalTitle"></h3>
+          <button id="scheduleCalNextBtn" class="btn btn-ghost btn-sm" type="button">▶</button>
+          <button id="scheduleCalTodayBtn" class="btn btn-ghost btn-sm" type="button">오늘</button>
+        </div>
+
+        <div id="scheduleCalNoDueWrap" class="cal-nodue hidden">
+          <span class="cal-nodue-label">만기일 미정</span>
+          <div id="scheduleCalNoDueList" class="cal-nodue-list"></div>
+        </div>
+
+        <div class="calendar-grid cal-weekday-row">
+          <div class="cal-weekday cal-sun">일</div>
+          <div class="cal-weekday">월</div>
+          <div class="cal-weekday">화</div>
+          <div class="cal-weekday">수</div>
+          <div class="cal-weekday">목</div>
+          <div class="cal-weekday">금</div>
+          <div class="cal-weekday cal-sat">토</div>
+        </div>
+        <div class="calendar-grid" id="scheduleCalDays"></div>
+
+        <section id="scheduleCalDetail" class="cal-detail hidden">
+          <div class="cal-detail-header">
+            <h4 id="scheduleCalDetailTitle"></h4>
+            <button id="scheduleCalAddForDateBtn" class="btn btn-primary btn-sm" type="button">+ 이 날짜에 추가</button>
+          </div>
+          <div id="scheduleCalDetailList"></div>
+          <p id="scheduleCalDetailEmpty" class="empty-msg hidden">이 날짜가 만기 도래일인 일정이 없습니다.</p>
+        </section>
       </section>
     </div>
   </div>

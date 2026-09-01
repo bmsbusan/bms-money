@@ -200,6 +200,43 @@
   const siteAccountsBody = $("#siteAccountsBody");
   const siteAccountsEmptyMsg = $("#siteAccountsEmptyMsg");
 
+  // ---------- 현장별 1년 스케줄표 화면 요소 ----------
+  const siteSchedulesSection = $("#siteSchedulesSection");
+  const scheduleFilterSite = $("#scheduleFilterSite");
+  const scheduleFilterTag = $("#scheduleFilterTag");
+  const scheduleSearchInput = $("#scheduleSearchInput");
+  const scheduleSearchResetBtn = $("#scheduleSearchResetBtn");
+  const addScheduleBtn = $("#addScheduleBtn");
+  const scheduleAddForm = $("#scheduleAddForm");
+  const newScheduleSite = $("#newScheduleSite");
+  const newScheduleCategory = $("#newScheduleCategory");
+  const newScheduleRemarks = $("#newScheduleRemarks");
+  const newScheduleDue = $("#newScheduleDue");
+  const newScheduleAmount = $("#newScheduleAmount");
+  const newScheduleFeeNote = $("#newScheduleFeeNote");
+  const newScheduleTag = $("#newScheduleTag");
+  const saveScheduleBtn = $("#saveScheduleBtn");
+  const cancelScheduleBtn = $("#cancelScheduleBtn");
+  const scheduleAddError = $("#scheduleAddError");
+  const scheduleViewListBtn = $("#scheduleViewListBtn");
+  const scheduleViewCalendarBtn = $("#scheduleViewCalendarBtn");
+  const scheduleListView = $("#scheduleListView");
+  const scheduleCalendarView = $("#scheduleCalendarView");
+  const scheduleBody = $("#scheduleBody");
+  const scheduleEmptyMsg = $("#scheduleEmptyMsg");
+  const scheduleCalPrevBtn = $("#scheduleCalPrevBtn");
+  const scheduleCalNextBtn = $("#scheduleCalNextBtn");
+  const scheduleCalTodayBtn = $("#scheduleCalTodayBtn");
+  const scheduleCalTitle = $("#scheduleCalTitle");
+  const scheduleCalDays = $("#scheduleCalDays");
+  const scheduleCalNoDueWrap = $("#scheduleCalNoDueWrap");
+  const scheduleCalNoDueList = $("#scheduleCalNoDueList");
+  const scheduleCalDetail = $("#scheduleCalDetail");
+  const scheduleCalDetailTitle = $("#scheduleCalDetailTitle");
+  const scheduleCalAddForDateBtn = $("#scheduleCalAddForDateBtn");
+  const scheduleCalDetailList = $("#scheduleCalDetailList");
+  const scheduleCalDetailEmpty = $("#scheduleCalDetailEmpty");
+
   // ---------- 작업내역 조회 화면 요소 ----------
   const overviewSection = $("#overviewSection");
   const overviewModeMonthBtn = $("#overviewModeMonthBtn");
@@ -221,7 +258,7 @@
   let records = [];
   let editingId = null;
   let pollTimer = null;
-  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "workMemos" | "accounting" | "accountingOverview" | "followup" | "overview"
+  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "workMemos" | "accounting" | "accountingOverview" | "followup" | "overview" | "siteAccounts" | "siteSchedules"
   let historyRows = [];
   let expandedMonths = new Set();
   let historyMode = "month"; // "month" | "year"
@@ -272,6 +309,15 @@
   let siteAccountsKeyword = "";
   let siteAccountCopiedTimers = new Map(); // id -> setTimeout id ("복사됨!" 버튼 상태를 되돌리는 타이머)
   let siteAccountAmounts = new Map(); // id -> 입력 중인 납부금액 문자열(다른 행 수정 등으로 표가 다시 그려져도 유지)
+
+  // 현장별 1년 스케줄표 상태
+  const SCHEDULE_TAGS = ["보험", "건물 점검", "설비 점검", "소독", "저수조청소", "기타"];
+  let scheduleEntries = [];
+  let editingScheduleId = null;
+  let scheduleView = "list"; // "list" | "calendar"
+  let scheduleCalYear = new Date().getFullYear();
+  let scheduleCalMonth = new Date().getMonth() + 1; // 1~12
+  let scheduleCalSelectedDate = null; // "YYYY-MM-DD" | null
 
   const won = (n) => (Number(n) || 0).toLocaleString("ko-KR") + "원";
 
@@ -340,6 +386,7 @@
       followup: followupSection,
       overview: overviewSection,
       siteAccounts: siteAccountsSection,
+      siteSchedules: siteSchedulesSection,
     };
     listSection.classList.toggle("hidden", !CATEGORIES.includes(tab));
     Object.entries(sectionsByTab).forEach(([key, el]) => {
@@ -362,6 +409,8 @@
       loadOverview();
     } else if (tab === "siteAccounts") {
       loadSiteAccounts();
+    } else if (tab === "siteSchedules") {
+      loadSchedules();
     } else {
       loadRecords();
     }
@@ -412,6 +461,9 @@
       // 다시 그려지면 선택/입력이 끊기는 문제가 있어(자동 새로고침 주기와 겹침),
       // 다른 탭과 달리 5초 자동 새로고침 대상에서 제외합니다. 데이터는 탭을 다시
       // 열거나 검색/추가/수정/삭제 시 그때그때 최신으로 불러옵니다.
+    } else if (activeTab === "siteSchedules") {
+      // 이 탭도 업체명·비고 등 텍스트를 드래그해서 복사하는 경우가 많을 것으로 보여
+      // (현장별 계좌번호 정리 탭과 같은 이유로) 5초 자동 새로고침 대상에서 제외합니다.
     } else {
       if (editingId === null) loadRecords();
     }
@@ -3207,6 +3259,385 @@
     }
   });
 
+  // ================= 현장별 1년 스케줄표 (보험 만기·법정 점검·소독·저수조청소 등) =================
+  // 사용자가 업로드한 "현장별 1년 스케줄표.xlsx"를 초기 데이터로 반영한 화면입니다.
+  // 만기 도래일 기준 오름차순 정렬이 기본이며, 만기 도래일이 없는(해당없음) 항목은
+  // 정렬 순서상 맨 뒤로 보냅니다(서버에서 이미 이렇게 정렬해서 내려줍니다).
+  // 현장/태그/키워드 필터는 서버에서 전체를 한 번 불러온 뒤 화면(클라이언트)에서
+  // 적용합니다 — 이렇게 하면 "현장" 드롭다운이 필터링 중에도 항상 전체 현장 목록을
+  // 그대로 유지합니다(서버 필터링 방식이면 현장을 하나 고른 뒤 드롭다운이 그 현장
+  // 하나로 좁아져 버리는 문제가 있음).
+
+  const SCHEDULE_TAG_CLASS = {
+    "보험": "insurance",
+    "건물 점검": "building",
+    "설비 점검": "equipment",
+    "소독": "disinfect",
+    "저수조청소": "tank",
+    "기타": "etc",
+  };
+
+  function renderScheduleTagSelects() {
+    const filterOpts = `<option value="">전체 태그</option>` +
+      SCHEDULE_TAGS.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
+    scheduleFilterTag.innerHTML = filterOpts;
+    newScheduleTag.innerHTML = SCHEDULE_TAGS
+      .map((t) => `<option value="${escapeHtml(t)}" ${t === "기타" ? "selected" : ""}>${escapeHtml(t)}</option>`)
+      .join("");
+  }
+
+  function scheduleTagBadgeHtml(tag) {
+    const cls = SCHEDULE_TAG_CLASS[tag] || "etc";
+    return `<span class="tag-badge tag-${cls}">${escapeHtml(tag)}</span>`;
+  }
+
+  let scheduleAllEntries = []; // 필터 적용 전, 서버에서 받은 전체 목록(만기 도래일 오름차순)
+
+  async function loadSchedules() {
+    const data = await api("/api/site-schedules?sort=asc");
+    scheduleAllEntries = data.entries;
+    renderScheduleSiteFilterOptions();
+    applyScheduleFilters();
+  }
+
+  function renderScheduleSiteFilterOptions() {
+    const prev = scheduleFilterSite.value;
+    const names = Array.from(new Set(scheduleAllEntries.map((r) => r.site_name))).sort((a, b) => a.localeCompare(b, "ko"));
+    scheduleFilterSite.innerHTML = `<option value="">전체 현장</option>` +
+      names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+    if (names.includes(prev)) scheduleFilterSite.value = prev;
+  }
+
+  function applyScheduleFilters() {
+    const site = scheduleFilterSite.value;
+    const tag = scheduleFilterTag.value;
+    const keyword = scheduleSearchInput.value.trim().toLowerCase();
+    scheduleEntries = scheduleAllEntries.filter((r) => {
+      if (site && r.site_name !== site) return false;
+      if (tag && r.tag !== tag) return false;
+      if (keyword) {
+        const hay = `${r.site_name} ${r.category} ${r.remarks}`.toLowerCase();
+        if (!hay.includes(keyword)) return false;
+      }
+      return true;
+    });
+    renderSchedule();
+    if (scheduleView === "calendar") renderScheduleCalendar();
+  }
+
+  scheduleFilterSite.addEventListener("change", applyScheduleFilters);
+  scheduleFilterTag.addEventListener("change", applyScheduleFilters);
+  scheduleSearchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") applyScheduleFilters();
+  });
+  scheduleSearchResetBtn.addEventListener("click", () => {
+    scheduleFilterSite.value = "";
+    scheduleFilterTag.value = "";
+    scheduleSearchInput.value = "";
+    applyScheduleFilters();
+  });
+
+  addScheduleBtn.addEventListener("click", () => {
+    scheduleAddError.textContent = "";
+    scheduleAddForm.classList.toggle("hidden");
+  });
+  cancelScheduleBtn.addEventListener("click", () => {
+    scheduleAddForm.classList.add("hidden");
+    resetScheduleAddForm();
+  });
+
+  function resetScheduleAddForm() {
+    newScheduleSite.value = "";
+    newScheduleCategory.value = "";
+    newScheduleRemarks.value = "";
+    newScheduleDue.value = "";
+    newScheduleAmount.value = "";
+    newScheduleFeeNote.value = "";
+    newScheduleTag.value = "기타";
+    scheduleAddError.textContent = "";
+  }
+
+  saveScheduleBtn.addEventListener("click", async () => {
+    scheduleAddError.textContent = "";
+    if (!newScheduleSite.value.trim()) { scheduleAddError.textContent = "현장명을 입력해주세요."; return; }
+    if (!newScheduleCategory.value.trim()) { scheduleAddError.textContent = "구분(업무 내용)을 입력해주세요."; return; }
+    try {
+      await api("/api/site-schedules", {
+        method: "POST",
+        body: JSON.stringify({
+          site_name: newScheduleSite.value,
+          category: newScheduleCategory.value,
+          remarks: newScheduleRemarks.value,
+          due_date: newScheduleDue.value || null,
+          amount: newScheduleAmount.value,
+          fee_note: newScheduleFeeNote.value,
+          tag: newScheduleTag.value,
+        }),
+      });
+      scheduleAddForm.classList.add("hidden");
+      resetScheduleAddForm();
+      await loadSchedules();
+    } catch (err) {
+      scheduleAddError.textContent = err.message;
+    }
+  });
+
+  function isScheduleOverdue(r) {
+    return !!r.due_date && r.due_date < todayStr();
+  }
+
+  function renderSchedule() {
+    if (scheduleEntries.length === 0) {
+      scheduleBody.innerHTML = "";
+      scheduleEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    scheduleEmptyMsg.classList.add("hidden");
+    scheduleBody.innerHTML = scheduleEntries
+      .map((r, i) => (editingScheduleId === r.id ? scheduleEditRowHtml(r, i) : scheduleViewRowHtml(r, i)))
+      .join("");
+  }
+
+  function scheduleViewRowHtml(r, i) {
+    const rowClass = isScheduleOverdue(r) ? "overdue-row" : "";
+    return `
+      <tr class="${rowClass}" data-id="${r.id}">
+        <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
+        <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
+        <td class="content-cell-wide" data-label="구분"><span class="cell-value">${escapeHtml(r.category) || "-"}</span></td>
+        <td class="content-cell-wide" data-label="비고"><span class="cell-value">${escapeHtml(r.remarks) || "-"}</span></td>
+        <td class="col-date" data-label="만기 도래일"><span class="cell-value">${escapeHtml(r.due_date) || "-"}</span></td>
+        <td data-label="금액"><span class="cell-value">${escapeHtml(r.amount) || "-"}</span></td>
+        <td data-label="관리비 적용"><span class="cell-value">${escapeHtml(r.fee_note) || "-"}</span></td>
+        <td data-label="태그"><span class="cell-value">${scheduleTagBadgeHtml(r.tag)}</span></td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-ghost btn-sm" data-action="edit-schedule" data-id="${r.id}">수정</button>
+            <button class="btn btn-danger btn-sm" data-action="delete-schedule" data-id="${r.id}">삭제</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  function scheduleEditRowHtml(r, i) {
+    const tagOpts = SCHEDULE_TAGS
+      .map((t) => `<option value="${escapeHtml(t)}" ${t === r.tag ? "selected" : ""}>${escapeHtml(t)}</option>`)
+      .join("");
+    return `
+      <tr data-id="${r.id}">
+        <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
+        <td data-label="현장명"><input class="edit-input" data-edit="site_name" value="${escapeHtml(r.site_name)}" /></td>
+        <td data-label="구분"><input class="edit-input" data-edit="category" value="${escapeHtml(r.category)}" /></td>
+        <td data-label="비고"><input class="edit-input" data-edit="remarks" value="${escapeHtml(r.remarks)}" /></td>
+        <td class="col-date" data-label="만기 도래일"><input class="edit-input" type="date" data-edit="due_date" value="${r.due_date || ""}" /></td>
+        <td data-label="금액"><input class="edit-input" data-edit="amount" value="${escapeHtml(r.amount)}" /></td>
+        <td data-label="관리비 적용"><input class="edit-input" data-edit="fee_note" value="${escapeHtml(r.fee_note)}" /></td>
+        <td data-label="태그"><select class="edit-input" data-edit="tag">${tagOpts}</select></td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-primary btn-sm" data-action="save-edit-schedule" data-id="${r.id}">저장</button>
+            <button class="btn btn-ghost btn-sm" data-action="cancel-edit-schedule" data-id="${r.id}">취소</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  scheduleBody.addEventListener("click", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (!action || !id) return;
+
+    if (action === "edit-schedule") {
+      editingScheduleId = Number(id);
+      renderSchedule();
+    } else if (action === "cancel-edit-schedule") {
+      editingScheduleId = null;
+      renderSchedule();
+    } else if (action === "save-edit-schedule") {
+      const row = e.target.closest("tr");
+      const patch = {
+        site_name: row.querySelector('[data-edit="site_name"]').value,
+        category: row.querySelector('[data-edit="category"]').value,
+        remarks: row.querySelector('[data-edit="remarks"]').value,
+        due_date: row.querySelector('[data-edit="due_date"]').value || null,
+        amount: row.querySelector('[data-edit="amount"]').value,
+        fee_note: row.querySelector('[data-edit="fee_note"]').value,
+        tag: row.querySelector('[data-edit="tag"]').value,
+      };
+      try {
+        await api(`/api/site-schedules/${id}`, { method: "PUT", body: JSON.stringify(patch) });
+        editingScheduleId = null;
+        await loadSchedules();
+      } catch (err) {
+        alert(err.message);
+      }
+    } else if (action === "delete-schedule") {
+      if (!confirm("이 일정을 삭제할까요?")) return;
+      try {
+        await api(`/api/site-schedules/${id}`, { method: "DELETE" });
+        await loadSchedules();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  // ---- 현장별 1년 스케줄표: 목록 보기 / 달력 보기 전환 ----
+  function switchScheduleView(view) {
+    scheduleView = view;
+    scheduleViewListBtn.classList.toggle("subtab-active", view === "list");
+    scheduleViewCalendarBtn.classList.toggle("subtab-active", view === "calendar");
+    scheduleListView.classList.toggle("hidden", view !== "list");
+    scheduleCalendarView.classList.toggle("hidden", view !== "calendar");
+    if (view === "calendar") renderScheduleCalendar();
+  }
+  scheduleViewListBtn.addEventListener("click", () => switchScheduleView("list"));
+  scheduleViewCalendarBtn.addEventListener("click", () => switchScheduleView("calendar"));
+
+  // ---- 현장별 1년 스케줄표: 달력 보기 ----
+  scheduleCalPrevBtn.addEventListener("click", () => {
+    scheduleCalMonth -= 1;
+    if (scheduleCalMonth < 1) { scheduleCalMonth = 12; scheduleCalYear -= 1; }
+    renderScheduleCalendar();
+  });
+  scheduleCalNextBtn.addEventListener("click", () => {
+    scheduleCalMonth += 1;
+    if (scheduleCalMonth > 12) { scheduleCalMonth = 1; scheduleCalYear += 1; }
+    renderScheduleCalendar();
+  });
+  scheduleCalTodayBtn.addEventListener("click", () => {
+    const t = new Date();
+    scheduleCalYear = t.getFullYear();
+    scheduleCalMonth = t.getMonth() + 1;
+    scheduleCalSelectedDate = todayStr();
+    renderScheduleCalendar();
+  });
+
+  function groupSchedulesByDate(entries) {
+    const map = new Map();
+    entries.forEach((r) => {
+      if (!r.due_date) return;
+      if (!map.has(r.due_date)) map.set(r.due_date, []);
+      map.get(r.due_date).push(r);
+    });
+    return map;
+  }
+
+  function scheduleCalChipHtml(r) {
+    const cls = isScheduleOverdue(r) ? "cal-chip-overdue" : `cal-chip-tag-${SCHEDULE_TAG_CLASS[r.tag] || "etc"}`;
+    const label = `${r.site_name}${r.category ? " · " + r.category : ""}`;
+    return `<div class="cal-chip ${cls}" title="${escapeHtml(label)}">${escapeHtml(r.site_name)}</div>`;
+  }
+
+  function renderScheduleCalendar() {
+    scheduleCalTitle.textContent = `${scheduleCalYear}년 ${scheduleCalMonth}월`;
+
+    const byDate = groupSchedulesByDate(scheduleEntries);
+    const noDue = scheduleEntries.filter((r) => !r.due_date);
+    if (noDue.length === 0) {
+      scheduleCalNoDueWrap.classList.add("hidden");
+      scheduleCalNoDueList.innerHTML = "";
+    } else {
+      scheduleCalNoDueWrap.classList.remove("hidden");
+      scheduleCalNoDueList.innerHTML = noDue.map(scheduleCalChipHtml).join("");
+    }
+
+    // 이번 달 앞뒤로 달력 6주(42칸)를 채웁니다(일요일 시작 표준 달력).
+    const daysInMonth = new Date(Date.UTC(scheduleCalYear, scheduleCalMonth, 0)).getUTCDate();
+    const firstDow = new Date(Date.UTC(scheduleCalYear, scheduleCalMonth - 1, 1)).getUTCDay(); // 0=일
+    const cells = [];
+    for (let i = 0; i < firstDow; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push({ y: scheduleCalYear, m: scheduleCalMonth, d });
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    const today = todayStr();
+    const maxShow = 3;
+    scheduleCalDays.innerHTML = cells
+      .map((c, idx) => {
+        if (!c) return `<div class="cal-day cal-day-outside" style="cursor:default"></div>`;
+        const key = `${c.y}-${String(c.m).padStart(2, "0")}-${String(c.d).padStart(2, "0")}`;
+        const dow = idx % 7;
+        const items = byDate.get(key) || [];
+        const shown = items.slice(0, maxShow);
+        const moreCount = items.length - shown.length;
+        const chips = shown.map(scheduleCalChipHtml).join("");
+        const moreHtml = moreCount > 0 ? `<div class="cal-day-more">+${moreCount}건 더</div>` : "";
+        const classes = [
+          "cal-day",
+          key === today ? "cal-day-today" : "",
+          key === scheduleCalSelectedDate ? "cal-day-selected" : "",
+          dow === 0 ? "cal-day-sun" : dow === 6 ? "cal-day-sat" : "",
+        ].filter(Boolean).join(" ");
+        return `<div class="${classes}" data-date="${key}"><div class="cal-day-num">${c.d}</div>${chips}${moreHtml}</div>`;
+      })
+      .join("");
+
+    renderScheduleCalDetail();
+  }
+
+  scheduleCalDays.addEventListener("click", (e) => {
+    const cell = e.target.closest(".cal-day[data-date]");
+    if (!cell) return;
+    scheduleCalSelectedDate = cell.getAttribute("data-date");
+    renderScheduleCalendar();
+  });
+
+  function renderScheduleCalDetail() {
+    if (!scheduleCalSelectedDate) {
+      scheduleCalDetail.classList.add("hidden");
+      return;
+    }
+    scheduleCalDetail.classList.remove("hidden");
+    const [y, m, d] = scheduleCalSelectedDate.split("-").map(Number);
+    scheduleCalDetailTitle.textContent = `${y}년 ${m}월 ${d}일 만기 도래 일정`;
+    const items = scheduleEntries.filter((r) => r.due_date === scheduleCalSelectedDate);
+    if (items.length === 0) {
+      scheduleCalDetailList.innerHTML = "";
+      scheduleCalDetailEmpty.classList.remove("hidden");
+    } else {
+      scheduleCalDetailEmpty.classList.add("hidden");
+      scheduleCalDetailList.innerHTML = items
+        .map((r) => `
+          <div class="cal-detail-item" data-id="${r.id}">
+            ${scheduleTagBadgeHtml(r.tag)}
+            <span class="cal-detail-site">${escapeHtml(r.site_name)}</span>
+            <span class="cal-detail-content">${escapeHtml(r.category) || "-"}</span>
+            <span class="cal-detail-remarks">${escapeHtml(r.remarks) || ""}</span>
+            <span class="row-actions">
+              <button class="btn btn-ghost btn-sm" data-action="edit-schedule-from-cal" data-id="${r.id}">수정</button>
+              <button class="btn btn-danger btn-sm" data-action="delete-schedule" data-id="${r.id}">삭제</button>
+            </span>
+          </div>`)
+        .join("");
+    }
+  }
+
+  scheduleCalDetailList.addEventListener("click", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (!action || !id) return;
+    if (action === "edit-schedule-from-cal") {
+      editingScheduleId = Number(id);
+      switchScheduleView("list");
+      renderSchedule();
+    } else if (action === "delete-schedule") {
+      if (!confirm("이 일정을 삭제할까요?")) return;
+      try {
+        await api(`/api/site-schedules/${id}`, { method: "DELETE" });
+        await loadSchedules();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  scheduleCalAddForDateBtn.addEventListener("click", () => {
+    switchScheduleView("list");
+    scheduleAddForm.classList.remove("hidden");
+    scheduleAddError.textContent = "";
+    newScheduleDue.value = scheduleCalSelectedDate || "";
+  });
+
   // ---------- 상태 토글 버튼 (품의/입금/완료) 공통 렌더링 ----------
   // 체크박스는 그대로 두고(기존 change 이벤트 로직 재사용), 화면에는 버튼처럼 보이는
   // .toggle-chip-face 를 보여줍니다. 미완료(대기)/완료 문구는 체크 여부에 따라 CSS로 전환됩니다.
@@ -3235,5 +3666,6 @@
   }
 
   // ---------- 시작 ----------
+  renderScheduleTagSelects();
   checkAuth();
 })();
