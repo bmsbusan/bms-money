@@ -55,6 +55,7 @@
       <button class="tab-btn" data-tab="history">작업 히스토리</button>
       <button class="tab-btn" data-tab="journal">시설 업무일지</button>
       <button class="tab-btn" data-tab="overview">작업 내역 및 시설 업무일지 조회</button>
+      <button class="tab-btn" data-tab="workMemos">업무 메모</button>
       <button class="tab-btn" data-tab="accounting">경리 업무일지</button>
       <button class="tab-btn" data-tab="accountingOverview">경리 업무일지 조회</button>
       <button class="tab-btn" data-tab="followup">후속 작업</button>
@@ -256,6 +257,63 @@
           <tbody id="journalBody"></tbody>
         </table>
         <p id="journalEmptyMsg" class="empty-msg hidden">등록된 업무일지가 없습니다.</p>
+      </section>
+    </div>
+
+    <!-- 업무 메모 화면 (No / 작업일 / 현장 / 업무 / 완료 — 마감기한 없음, 완료 내역도 항상 조회 가능) -->
+    <div id="workMemosSection" class="hidden">
+      <section class="toolbar">
+        <div class="filters">
+          <select id="workMemoFilterSite">
+            <option value="">전체 현장</option>
+          </select>
+          <input id="workMemoFilterDate" type="date" title="특정 날짜만 보기" />
+          <select id="workMemoFilterDone">
+            <option value="">전체 상태</option>
+            <option value="0">미완료</option>
+            <option value="1">완료</option>
+          </select>
+          <button id="workMemoFilterResetBtn" class="btn btn-ghost">초기화</button>
+        </div>
+        <button id="addWorkMemoBtn" class="btn btn-primary">+ 새 메모 추가</button>
+      </section>
+
+      <section id="workMemoAddForm" class="add-form hidden">
+        <div class="add-form-grid">
+          <label class="field-label">작업 날짜
+            <input id="newWorkMemoDate" type="date" required />
+          </label>
+          <select id="newWorkMemoSite" required>
+            <option value="">현장 선택</option>
+          </select>
+          <input id="newWorkMemoContent" type="text" placeholder="업무 내용 입력" />
+          <label class="toggle-chip toggle-chip-static">
+            <input id="newWorkMemoDone" type="checkbox" />
+            <span class="toggle-chip-face"><span class="toggle-chip-box"></span>완료</span>
+          </label>
+        </div>
+        <div class="add-form-actions">
+          <button id="saveWorkMemoBtn" class="btn btn-primary">저장</button>
+          <button id="cancelWorkMemoBtn" class="btn btn-ghost">취소</button>
+        </div>
+        <p id="workMemoAddError" class="error-msg"></p>
+      </section>
+
+      <section class="table-wrap">
+        <table id="workMemoTable">
+          <thead>
+            <tr>
+              <th class="col-no">No.</th>
+              <th class="col-date">작업일</th>
+              <th class="col-site">현장명</th>
+              <th class="col-content-wide">업무</th>
+              <th class="col-check">완료</th>
+              <th class="col-manage">관리</th>
+            </tr>
+          </thead>
+          <tbody id="workMemoBody"></tbody>
+        </table>
+        <p id="workMemoEmptyMsg" class="empty-msg hidden">등록된 업무 메모가 없습니다.</p>
       </section>
     </div>
 

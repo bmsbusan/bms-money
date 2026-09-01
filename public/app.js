@@ -92,6 +92,24 @@
   const downloadMonthlyBtn = $("#downloadMonthlyBtn");
   const exportError = $("#exportError");
 
+  // ---------- 업무 메모 화면 요소 ----------
+  const workMemosSection = $("#workMemosSection");
+  const workMemoFilterSite = $("#workMemoFilterSite");
+  const workMemoFilterDate = $("#workMemoFilterDate");
+  const workMemoFilterDone = $("#workMemoFilterDone");
+  const workMemoFilterResetBtn = $("#workMemoFilterResetBtn");
+  const addWorkMemoBtn = $("#addWorkMemoBtn");
+  const workMemoAddForm = $("#workMemoAddForm");
+  const newWorkMemoDate = $("#newWorkMemoDate");
+  const newWorkMemoSite = $("#newWorkMemoSite");
+  const newWorkMemoContent = $("#newWorkMemoContent");
+  const newWorkMemoDone = $("#newWorkMemoDone");
+  const saveWorkMemoBtn = $("#saveWorkMemoBtn");
+  const cancelWorkMemoBtn = $("#cancelWorkMemoBtn");
+  const workMemoAddError = $("#workMemoAddError");
+  const workMemoBody = $("#workMemoBody");
+  const workMemoEmptyMsg = $("#workMemoEmptyMsg");
+
   // ---------- 경리 업무일지 화면 요소 ----------
   const accountingSection = $("#accountingSection");
   const accountingFilterSite = $("#accountingFilterSite");
@@ -203,7 +221,7 @@
   let records = [];
   let editingId = null;
   let pollTimer = null;
-  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "accounting" | "accountingOverview" | "followup" | "overview"
+  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "workMemos" | "accounting" | "accountingOverview" | "followup" | "overview"
   let historyRows = [];
   let expandedMonths = new Set();
   let historyMode = "month"; // "month" | "year"
@@ -213,6 +231,10 @@
   // 업무일지 상태
   let journalEntries = [];
   let editingJournalId = null;
+
+  // 업무 메모 상태
+  let workMemoEntries = [];
+  let editingWorkMemoId = null;
 
   // 경리 업무일지 상태
   let accountingEntries = [];
@@ -312,6 +334,7 @@
     const sectionsByTab = {
       history: historyView,
       journal: journalSection,
+      workMemos: workMemosSection,
       accounting: accountingSection,
       accountingOverview: accountingOverviewSection,
       followup: followupSection,
@@ -327,6 +350,8 @@
       loadMonthlySummary();
     } else if (tab === "journal") {
       loadJournal();
+    } else if (tab === "workMemos") {
+      loadWorkMemos();
     } else if (tab === "accounting") {
       loadAccounting();
     } else if (tab === "accountingOverview") {
@@ -372,6 +397,8 @@
       loadMonthlySummary();
     } else if (activeTab === "journal") {
       if (editingJournalId === null) loadJournal();
+    } else if (activeTab === "workMemos") {
+      if (editingWorkMemoId === null) loadWorkMemos();
     } else if (activeTab === "accounting") {
       if (editingAccountingId === null) loadAccounting();
     } else if (activeTab === "accountingOverview") {
@@ -425,6 +452,8 @@
       [historyFilterSite, filterOpts],
       [journalFilterSite, filterOpts],
       [newJournalSite, pickOpts],
+      [workMemoFilterSite, filterOpts],
+      [newWorkMemoSite, pickOpts],
       [accountingFilterSite, filterOpts],
       [newAccountingSite, pickOpts],
       [acctOverviewFilterSite, filterOpts],
@@ -1553,6 +1582,180 @@
       await xlsDownloadBlob(wb, `월간시설작업일지_${month}.xlsx`);
     } catch (err) {
       exportError.textContent = err.message;
+    }
+  });
+
+  // ================= 업무 메모 (No / 작업일 / 현장 / 업무 / 완료 — 마감기한 없음) =================
+  // 경리 업무일지와 같은 구성이지만 마감기한 없이 간단하게 기록하는 메모용 탭입니다.
+  // 경리 업무일지의 자동 이월・지난 완료건 숨김 기능은 없고, 완료된 내역도 이 화면에서
+  // (완료 필터를 "전체 상태" 또는 "완료"로 두면) 항상 그대로 조회할 수 있습니다.
+
+  async function loadWorkMemos() {
+    const params = new URLSearchParams({ sort: "desc" });
+    if (workMemoFilterSite.value) params.set("site", workMemoFilterSite.value);
+    if (workMemoFilterDate.value) params.set("date", workMemoFilterDate.value);
+    if (workMemoFilterDone.value !== "") params.set("done", workMemoFilterDone.value);
+    const data = await api(`/api/work-memos?${params.toString()}`);
+    workMemoEntries = data.entries;
+    // 완료된 메모가 항상 목록 맨 위로 오도록 정렬하고, 완료 여부가 같으면
+    // 그 안에서는 현장명 가나다순으로 보이도록 정렬합니다(경리 업무일지와 동일한 방식).
+    workMemoEntries.sort((a, b) => (b.done ? 1 : 0) - (a.done ? 1 : 0) || a.site_name.localeCompare(b.site_name, "ko"));
+    renderWorkMemos();
+  }
+
+  workMemoFilterSite.addEventListener("change", loadWorkMemos);
+  workMemoFilterDate.addEventListener("change", loadWorkMemos);
+  workMemoFilterDone.addEventListener("change", loadWorkMemos);
+  workMemoFilterResetBtn.addEventListener("click", () => {
+    workMemoFilterSite.value = "";
+    workMemoFilterDate.value = "";
+    workMemoFilterDone.value = "";
+    loadWorkMemos();
+  });
+
+  addWorkMemoBtn.addEventListener("click", () => {
+    workMemoAddError.textContent = "";
+    workMemoAddForm.classList.toggle("hidden");
+    if (!workMemoAddForm.classList.contains("hidden") && !newWorkMemoDate.value) {
+      newWorkMemoDate.value = todayStr();
+    }
+  });
+  cancelWorkMemoBtn.addEventListener("click", () => {
+    workMemoAddForm.classList.add("hidden");
+    resetWorkMemoAddForm();
+  });
+
+  function resetWorkMemoAddForm() {
+    newWorkMemoDate.value = todayStr();
+    newWorkMemoSite.value = "";
+    newWorkMemoContent.value = "";
+    newWorkMemoDone.checked = false;
+    workMemoAddError.textContent = "";
+  }
+
+  saveWorkMemoBtn.addEventListener("click", async () => {
+    workMemoAddError.textContent = "";
+    if (!newWorkMemoSite.value) { workMemoAddError.textContent = "현장을 선택해주세요."; return; }
+    if (!newWorkMemoDate.value) { workMemoAddError.textContent = "작업 날짜를 선택해주세요."; return; }
+    if (!newWorkMemoContent.value.trim()) { workMemoAddError.textContent = "업무 내용을 입력해주세요."; return; }
+    try {
+      await api("/api/work-memos", {
+        method: "POST",
+        body: JSON.stringify({
+          work_date: newWorkMemoDate.value,
+          site_name: newWorkMemoSite.value,
+          content: newWorkMemoContent.value,
+          done: newWorkMemoDone.checked,
+        }),
+      });
+      workMemoAddForm.classList.add("hidden");
+      resetWorkMemoAddForm();
+      await loadWorkMemos();
+    } catch (err) {
+      workMemoAddError.textContent = err.message;
+    }
+  });
+
+  function renderWorkMemos() {
+    if (workMemoEntries.length === 0) {
+      workMemoBody.innerHTML = "";
+      workMemoEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    workMemoEmptyMsg.classList.add("hidden");
+    workMemoBody.innerHTML = workMemoEntries
+      .map((r, i) => (editingWorkMemoId === r.id ? workMemoEditRowHtml(r, i) : workMemoViewRowHtml(r, i)))
+      .join("");
+  }
+
+  function workMemoViewRowHtml(r, i) {
+    return `
+      <tr class="${r.done ? "paid-row" : ""}" data-id="${r.id}">
+        <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
+        <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+        <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
+        <td class="content-cell-wide" data-label="업무"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
+        <td class="col-check" data-label="완료">
+          <span class="cell-value">${toggleChipHtml("toggle-work-memo-done", r.id, r.done)}</span>
+        </td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-ghost btn-sm" data-action="edit-work-memo" data-id="${r.id}">수정</button>
+            <button class="btn btn-danger btn-sm" data-action="delete-work-memo" data-id="${r.id}">삭제</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  function workMemoEditRowHtml(r, i) {
+    const siteOpts = sites
+      .map((s) => `<option value="${escapeHtml(s.name)}" ${s.name === r.site_name ? "selected" : ""}>${escapeHtml(s.name)}</option>`)
+      .join("");
+    return `
+      <tr data-id="${r.id}">
+        <td class="col-no" data-label="No."><span class="cell-value">${i + 1}</span></td>
+        <td class="col-date" data-label="작업일"><input class="edit-input" type="date" data-edit="work_date" value="${r.work_date || ""}" /></td>
+        <td data-label="현장명"><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
+        <td data-label="업무"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
+        <td class="col-check" data-label="완료">
+          <span class="cell-value">${toggleChipEditHtml("done", r.done)}</span>
+        </td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-primary btn-sm" data-action="save-edit-work-memo" data-id="${r.id}">저장</button>
+            <button class="btn btn-ghost btn-sm" data-action="cancel-edit-work-memo" data-id="${r.id}">취소</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  workMemoBody.addEventListener("click", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (!action || !id) return;
+
+    if (action === "edit-work-memo") {
+      editingWorkMemoId = Number(id);
+      renderWorkMemos();
+    } else if (action === "cancel-edit-work-memo") {
+      editingWorkMemoId = null;
+      renderWorkMemos();
+    } else if (action === "save-edit-work-memo") {
+      const row = e.target.closest("tr");
+      const patch = {
+        work_date: row.querySelector('[data-edit="work_date"]').value || null,
+        site_name: row.querySelector('[data-edit="site_name"]').value,
+        content: row.querySelector('[data-edit="content"]').value,
+        done: row.querySelector('[data-edit="done"]').checked,
+      };
+      try {
+        await api(`/api/work-memos/${id}`, { method: "PUT", body: JSON.stringify(patch) });
+        editingWorkMemoId = null;
+        await loadWorkMemos();
+      } catch (err) {
+        alert(err.message);
+      }
+    } else if (action === "delete-work-memo") {
+      if (!confirm("이 업무 메모를 삭제할까요?")) return;
+      try {
+        await api(`/api/work-memos/${id}`, { method: "DELETE" });
+        await loadWorkMemos();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  workMemoBody.addEventListener("change", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (action === "toggle-work-memo-done" && id) {
+      try {
+        await api(`/api/work-memos/${id}`, { method: "PUT", body: JSON.stringify({ done: e.target.checked }) });
+        await loadWorkMemos();
+      } catch (err) {
+        alert(err.message);
+      }
     }
   });
 

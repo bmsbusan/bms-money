@@ -869,6 +869,131 @@ async function handleDeleteSiteAccount(id, env) {
   return json({ ok: true });
 }
 
+// ---- 업무 메모 (work_memos) ----
+// 경리 업무일지와 같은 형태이나 마감기한 없이 "작업 날짜 / 현장 / 업무 내용 / 완료"만
+// 기록하는 간단한 메모용 표입니다. 경리 업무일지의 자동 이월・지난 완료건 숨김 기능은
+// 없고, 완료된 내역도 항상 이 화면에서 그대로 조회할 수 있습니다.
+
+function rowToWorkMemo(row) {
+  return {
+    id: row.id,
+    work_date: row.work_date,
+    site_name: row.site_name,
+    content: row.content || "",
+    done: !!row.done,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function handleGetWorkMemos(request, env) {
+  const url = new URL(request.url);
+  const site = url.searchParams.get("site") || "";
+  const date = url.searchParams.get("date") || "";    // YYYY-MM-DD (특정 하루)
+  const from = url.searchParams.get("from") || "";     // YYYY-MM-DD
+  const to = url.searchParams.get("to") || "";         // YYYY-MM-DD
+  const done = url.searchParams.get("done") || "";     // "0" | "1" | ""
+  const keyword = url.searchParams.get("keyword") || "";
+  const sort = url.searchParams.get("sort") === "asc" ? "ASC" : "DESC";
+
+  let query = "SELECT * FROM work_memos WHERE 1=1";
+  const binds = [];
+  if (site) {
+    query += " AND site_name = ?";
+    binds.push(site);
+  }
+  if (date) {
+    query += " AND work_date = ?";
+    binds.push(date);
+  } else {
+    if (from) {
+      query += " AND work_date >= ?";
+      binds.push(from);
+    }
+    if (to) {
+      query += " AND work_date <= ?";
+      binds.push(to);
+    }
+  }
+  if (done === "0" || done === "1") {
+    query += " AND done = ?";
+    binds.push(Number(done));
+  }
+  if (keyword) {
+    query += " AND (site_name LIKE ? OR content LIKE ?)";
+    const k = `%${keyword}%`;
+    binds.push(k, k);
+  }
+  query += ` ORDER BY work_date ${sort}, id ASC`;
+
+  const stmt = env.DB.prepare(query).bind(...binds);
+  const { results } = await stmt.all();
+  return json({ entries: results.map(rowToWorkMemo) });
+}
+
+async function handleCreateWorkMemo(request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+  const site_name = typeof body.site_name === "string" ? body.site_name.trim() : "";
+  const work_date = typeof body.work_date === "string" && body.work_date ? body.work_date : "";
+  const content = typeof body.content === "string" ? body.content.trim() : "";
+  const done = toBool(body.done) ? 1 : 0;
+
+  if (!site_name) return badRequest("현장명을 선택해주세요.");
+  if (!work_date) return badRequest("작업 날짜를 선택해주세요.");
+  if (!content) return badRequest("업무 내용을 입력해주세요.");
+
+  const result = await env.DB.prepare(
+    `INSERT INTO work_memos (work_date, site_name, content, done, created_at, updated_at)
+     VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))`
+  )
+    .bind(work_date, site_name, content, done)
+    .run();
+
+  return json({ ok: true, id: result.meta.last_row_id });
+}
+
+async function handleUpdateWorkMemo(id, request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+
+  const fields = [];
+  const binds = [];
+
+  if (typeof body.site_name === "string") {
+    fields.push("site_name = ?");
+    binds.push(body.site_name.trim());
+  }
+  if (body.work_date !== undefined) {
+    fields.push("work_date = ?");
+    binds.push(body.work_date || "");
+  }
+  if (typeof body.content === "string") {
+    fields.push("content = ?");
+    binds.push(body.content.trim());
+  }
+  if (body.done !== undefined) {
+    fields.push("done = ?");
+    binds.push(toBool(body.done) ? 1 : 0);
+  }
+
+  if (fields.length === 0) return badRequest("수정할 내용이 없습니다.");
+
+  fields.push("updated_at = datetime('now')");
+  binds.push(id);
+
+  await env.DB.prepare(`UPDATE work_memos SET ${fields.join(", ")} WHERE id = ?`)
+    .bind(...binds)
+    .run();
+
+  return json({ ok: true });
+}
+
+async function handleDeleteWorkMemo(id, env) {
+  await env.DB.prepare("DELETE FROM work_memos WHERE id = ?").bind(id).run();
+  return json({ ok: true });
+}
+
 // ---- 메인 fetch 핸들러 ----
 
 export default {
@@ -986,6 +1111,20 @@ export default {
       }
       if (siteAccountMatch && method === "DELETE") {
         return await handleDeleteSiteAccount(Number(siteAccountMatch[1]), env);
+      }
+
+      if (path === "/api/work-memos" && method === "GET") {
+        return await handleGetWorkMemos(request, env);
+      }
+      if (path === "/api/work-memos" && method === "POST") {
+        return await handleCreateWorkMemo(request, env);
+      }
+      const workMemoMatch = path.match(/^\/api\/work-memos\/(\d+)$/);
+      if (workMemoMatch && method === "PUT") {
+        return await handleUpdateWorkMemo(Number(workMemoMatch[1]), request, env);
+      }
+      if (workMemoMatch && method === "DELETE") {
+        return await handleDeleteWorkMemo(Number(workMemoMatch[1]), env);
       }
 
       return json({ error: "Not Found" }, { status: 404 });

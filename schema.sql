@@ -144,3 +144,22 @@ INSERT OR IGNORE INTO site_accounts (site_name, bank, account_holder, account_nu
   ('포레나덕천1차 (구)', '부산', '포레나부산덕천상가관리단 홍종수', '113-2016-9088-04'),
   ('포레나덕천1차 (신)', '부산', '포레나덕천1상가관리회', '101-2095-7418-08'),
   ('포레나덕천2차', '부산', '포레나부산덕천2차상가관리단', '101-2095-8442-06');
+
+-- ============================================================
+-- 업무 메모 (경리 업무일지와 같은 형태이나 마감기한 없이 간단한 메모용:
+-- 작업 날짜 / 현장 / 업무 내용 / 완료 여부만 기록. 자동 이월・지난 완료건 숨김 없음 —
+-- 완료된 내역도 항상 이 화면에서 그대로 조회 가능)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS work_memos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  work_date TEXT NOT NULL,             -- 작업 날짜 YYYY-MM-DD
+  site_name TEXT NOT NULL,
+  content TEXT DEFAULT '',             -- 업무 내용
+  done INTEGER NOT NULL DEFAULT 0,     -- 완료 여부 (0/1)
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_work_memos_date ON work_memos(work_date);
+CREATE INDEX IF NOT EXISTS idx_work_memos_site ON work_memos(site_name);
+CREATE INDEX IF NOT EXISTS idx_work_memos_done ON work_memos(done);
