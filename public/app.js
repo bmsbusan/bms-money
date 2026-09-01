@@ -236,6 +236,9 @@
   const scheduleCalAddForDateBtn = $("#scheduleCalAddForDateBtn");
   const scheduleCalDetailList = $("#scheduleCalDetailList");
   const scheduleCalDetailEmpty = $("#scheduleCalDetailEmpty");
+  const scheduleExportMonth = $("#scheduleExportMonth");
+  const downloadScheduleTxtBtn = $("#downloadScheduleTxtBtn");
+  const scheduleExportError = $("#scheduleExportError");
 
   // ---------- 작업내역 조회 화면 요소 ----------
   const overviewSection = $("#overviewSection");
@@ -3590,6 +3593,48 @@
     }
   });
 
+  // ---- 현장별 1년 스케줄표: 월별 스케줄 텍스트(.txt) 다운로드 ----
+  // 화면에 걸려 있는 현장/태그/검색 필터와 무관하게, 선택한 달의 전체 스케줄을
+  // 태그 우선순위(보험->건물 점검->설비 점검->소독->저수조청소->세금->교육->기타)
+  // 순서로 묶어서 출력합니다(해당 월에 항목이 없는 태그는 그 구획 자체를 생략).
+  function scheduleTxtItemLine(r, i) {
+    const parts = [r.site_name];
+    if (r.category) parts.push(r.category);
+    if (r.remarks) parts.push(r.remarks);
+    return `${i + 1}. ${parts.join("-")}`;
+  }
+
+  downloadScheduleTxtBtn.addEventListener("click", () => {
+    scheduleExportError.textContent = "";
+    const monthValue = scheduleExportMonth.value; // "YYYY-MM"
+    if (!monthValue) {
+      scheduleExportError.textContent = "출력할 월을 선택해주세요.";
+      return;
+    }
+    const monthEntries = scheduleAllEntries.filter((r) => scheduleMonthKey(r.due_date) === monthValue);
+    if (monthEntries.length === 0) {
+      scheduleExportError.textContent = "해당 월에 등록된 일정이 없습니다.";
+      return;
+    }
+    const sections = SCHEDULE_TAGS
+      .map((tag) => {
+        const items = monthEntries
+          .filter((r) => r.tag === tag)
+          .sort((a, b) => {
+            const da = a.due_date || "";
+            const db = b.due_date || "";
+            if (da !== db) return da < db ? -1 : 1;
+            return a.id - b.id;
+          });
+        if (items.length === 0) return null;
+        const lines = items.map((r, i) => scheduleTxtItemLine(r, i)).join("\n");
+        return `${tag}\n\n${lines}`;
+      })
+      .filter(Boolean);
+    const text = `[${scheduleMonthLabel(monthValue)}]\n\n${sections.join("\n\n\n")}\n`;
+    downloadTextBlob(text, `현장별_1년_스케줄표_${monthValue}.txt`);
+  });
+
   // ---- 현장별 1년 스케줄표: 목록 보기 / 달력 보기 전환 ----
   function switchScheduleView(view) {
     scheduleView = view;
@@ -3775,5 +3820,6 @@
 
   // ---------- 시작 ----------
   renderScheduleTagSelects();
+  scheduleExportMonth.value = todayStr().slice(0, 7); // 기본값: 이번 달
   checkAuth();
 })();

@@ -650,7 +650,9 @@
 
       <section id="scheduleAddForm" class="add-form hidden">
         <div class="add-form-grid">
-          <input id="newScheduleSite" type="text" placeholder="현장명 입력" />
+          <select id="newScheduleSite">
+            <option value="">현장 선택</option>
+          </select>
           <input id="newScheduleCategory" type="text" placeholder="구분 (예: 승강기안전검사)" />
           <input id="newScheduleRemarks" type="text" placeholder="비고 입력 (업체명 등)" />
           <label class="field-label">만기 도래일
@@ -665,6 +667,15 @@
           <button id="cancelScheduleBtn" class="btn btn-ghost">취소</button>
         </div>
         <p id="scheduleAddError" class="error-msg"></p>
+      </section>
+
+      <section class="export-bar">
+        <div class="export-group">
+          <span class="export-label">월별 스케줄 텍스트로 다운로드</span>
+          <input id="scheduleExportMonth" type="month" />
+          <button id="downloadScheduleTxtBtn" class="btn btn-ghost">텍스트(.txt) 다운로드</button>
+        </div>
+        <p id="scheduleExportError" class="error-msg"></p>
       </section>
 
       <nav class="subtab-bar">
