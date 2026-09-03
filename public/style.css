@@ -587,6 +587,16 @@ tbody tr.overdue-row td { border-bottom: 1px solid #f4c6c6; }
   border-bottom: 1px solid var(--border);
 }
 
+/* 작업 내역 / 소독 / 저수조 청소(#recordsTable 공용): 목록의 작업일 기준 월별 그룹 구분 헤더 행 */
+#recordsTable tbody tr.record-month-header td {
+  background: #eef1f7;
+  color: var(--navy);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
 .col-cost { text-align: right; }
 /* 금액은 줄바꿈되면 행 높이가 들쭉날쭉해지므로 한 줄로 고정합니다. */
 td.col-cost { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -880,6 +890,25 @@ td.site-badge {
     border-bottom: none;
   }
   #scheduleTable tbody tr.schedule-month-header td::before {
+    content: none;
+  }
+
+  /* 작업 내역 / 소독 / 저수조 청소: 모바일 카드형 레이아웃에서도 월별 그룹 헤더는
+     일반 행(카드) 스타일이 아니라 얇은 구분 바 형태로 보이도록 재정의합니다. */
+  #recordsTable tbody tr.record-month-header {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    margin: 14px 0 6px;
+    padding: 0;
+  }
+  #recordsTable tbody tr.record-month-header td {
+    display: block;
+    padding: 6px 10px;
+    border-bottom: none;
+  }
+  #recordsTable tbody tr.record-month-header td::before {
     content: none;
   }
 

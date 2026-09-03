@@ -636,10 +636,32 @@
     sumPaidCost.textContent = won(paidCostSum);
   }
 
-  function sortedRecords() {
-    if (!sortKey) return records; // 정렬 안 함 -> 서버 기본 순서(입금 대기 먼저, 최신순) 그대로
+  // 작업일 기준 월별 그룹핑 키("YYYY-MM"). 작업일이 없으면 등록일(created_at) 기준,
+  // 그마저도 없으면 빈 문자열 키로 묶어 "작업일 미상" 그룹으로 맨 뒤에 표시합니다.
+  function recordMonthKey(r) {
+    return (r.work_date || r.created_at || "").slice(0, 7);
+  }
+
+  function recordMonthLabel(key) {
+    if (!key) return "작업일 미상";
+    const [y, m] = key.split("-");
+    return `${y}년 ${Number(m)}월`;
+  }
+
+  // 현재 정렬 상태(헤더 클릭으로 고른 site_name/work_date, 없으면 기본 "최신순")에 따른
+  // 비교 함수. 월별 그룹 안에서 입금 대기/입금 완료 두 묶음에 각각 적용합니다.
+  function recordComparator() {
+    if (!sortKey) {
+      // 기본 순서: 작업일(없으면 등록일) 최신순, 같으면 id 최신순
+      return (a, b) => {
+        const av = a.work_date || a.created_at || "";
+        const bv = b.work_date || b.created_at || "";
+        if (av !== bv) return av < bv ? 1 : -1;
+        return b.id - a.id;
+      };
+    }
     const dir = sortDir === "desc" ? -1 : 1;
-    return [...records].sort((a, b) => {
+    return (a, b) => {
       let av = a[sortKey] || "";
       let bv = b[sortKey] || "";
       if (sortKey === "site_name") {
@@ -650,7 +672,7 @@
       if (!av) return 1;
       if (!bv) return -1;
       return av < bv ? -1 * dir : av > bv ? 1 * dir : 0;
-    });
+    };
   }
 
   function updateSortHeaders() {
@@ -687,12 +709,35 @@
     }
     emptyMsg.classList.add("hidden");
 
-    recordsBody.innerHTML = sortedRecords()
-      .map((r) => {
-        if (editingId === r.id) return editRowHtml(r);
-        return viewRowHtml(r);
-      })
-      .join("");
+    // 작업일 기준 월별로 묶고, 월 그룹은 최신 달이 먼저 오도록(내림차순) 정렬합니다.
+    // ("작업일 미상" 그룹은 항상 맨 뒤)
+    const groups = new Map();
+    records.forEach((r) => {
+      const key = recordMonthKey(r);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    });
+    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+      if (a === b) return 0;
+      if (a === "") return 1;
+      if (b === "") return -1;
+      return a < b ? 1 : -1;
+    });
+
+    const cmp = recordComparator();
+    const parts = [];
+    sortedKeys.forEach((key) => {
+      const group = groups.get(key);
+      // 같은 월 안에서는 입금 대기 항목을 먼저, 입금 완료 항목은 아래로 배치합니다.
+      // (각 묶음 안의 순서는 헤더 클릭으로 고른 정렬 기준을 그대로 따름)
+      const unpaid = group.filter((r) => !r.paid).sort(cmp);
+      const paid = group.filter((r) => r.paid).sort(cmp);
+      parts.push(`<tr class="record-month-header"><td colspan="9">${escapeHtml(recordMonthLabel(key))}</td></tr>`);
+      [...unpaid, ...paid].forEach((r) => {
+        parts.push(editingId === r.id ? editRowHtml(r) : viewRowHtml(r));
+      });
+    });
+    recordsBody.innerHTML = parts.join("");
   }
 
   function viewRowHtml(r) {
