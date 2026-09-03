@@ -159,8 +159,29 @@
     </div>
     <!-- /listSection -->
 
-    <!-- 히스토리 화면 (월별 / 연도별) -->
+    <!-- 히스토리 화면: 작업 내역/소독/저수조 청소 내역을 구분 태그와 함께 한 목록에서 통합 조회
+         (월별/연도별 그룹 + 입금 완료 항목은 각 그룹 안에서 아래로 정렬) -->
     <div id="historyView" class="hidden">
+
+      <section class="summary-cards">
+        <div class="card">
+          <div class="card-value" id="histSumTotal">0</div>
+          <div class="card-label">전체 건수</div>
+        </div>
+        <div class="card card-warn">
+          <div class="card-value" id="histSumUnbilled">0</div>
+          <div class="card-label">품의 대기</div>
+        </div>
+        <div class="card card-warn">
+          <div class="card-value" id="histSumUnpaid">0</div>
+          <div class="card-label">입금 대기</div>
+        </div>
+        <div class="card card-good">
+          <div class="card-value" id="histSumPaidCost">0원</div>
+          <div class="card-label">입금 완료 합계</div>
+        </div>
+      </section>
+
       <nav class="subtab-bar">
         <button id="historyModeMonthBtn" class="subtab-btn subtab-active" data-mode="month">월별</button>
         <button id="historyModeYearBtn" class="subtab-btn" data-mode="year">연도별</button>
@@ -178,16 +199,21 @@
         <table id="historyTable">
           <thead>
             <tr>
-              <th class="col-site" id="historyPeriodHeader">월</th>
-              <th class="col-cost">작업 건수</th>
-              <th class="col-cost">청구금액 합계</th>
-              <th class="col-cost">입금금액 합계</th>
-              <th class="col-cost">미수금(청구-입금)</th>
+              <th class="col-tag">구분</th>
+              <th class="col-site sortable" data-sort="site_name">현장명<span class="sort-arrow"></span></th>
+              <th class="col-date sortable" data-sort="work_date">작업일<span class="sort-arrow"></span></th>
+              <th class="col-content">내용</th>
+              <th class="col-cost">비용</th>
+              <th class="col-check">품의</th>
+              <th class="col-check">입금</th>
+              <th class="col-date">입금일</th>
+              <th class="col-bank">입금 통장</th>
+              <th class="col-manage">관리</th>
             </tr>
           </thead>
           <tbody id="historyBody"></tbody>
         </table>
-        <p id="historyEmptyMsg" class="empty-msg hidden">아직 집계할 내역이 없습니다.</p>
+        <p id="historyEmptyMsg" class="empty-msg hidden">등록된 내역이 없습니다.</p>
       </section>
     </div>
 

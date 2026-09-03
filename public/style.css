@@ -535,7 +535,7 @@ input:focus, select:focus {
 }
 table { width: 100%; border-collapse: collapse; }
 #recordsTable { min-width: 780px; }
-#historyTable { min-width: 660px; }
+#historyTable { min-width: 860px; }
 #journalTable { min-width: 700px; }
 #followupTable { min-width: 760px; }
 #accountingTable { min-width: 720px; }
@@ -587,8 +587,9 @@ tbody tr.overdue-row td { border-bottom: 1px solid #f4c6c6; }
   border-bottom: 1px solid var(--border);
 }
 
-/* 작업 내역 / 소독 / 저수조 청소(#recordsTable 공용): 목록의 작업일 기준 월별 그룹 구분 헤더 행 */
-#recordsTable tbody tr.record-month-header td {
+/* 작업 내역 / 소독 / 저수조 청소(#recordsTable) / 작업 히스토리(#historyTable) 공용:
+   목록의 작업일 기준 월별 그룹 구분 헤더 행 */
+#recordsTable tbody tr.record-month-header td, #historyTable tbody tr.record-month-header td {
   background: #eef1f7;
   color: var(--navy);
   font-weight: 700;
@@ -663,24 +664,26 @@ td.site-badge {
 
 .empty-msg { text-align: center; color: var(--text-muted); padding: 30px 0; }
 
-/* ---------- 히스토리 / 작업내역 조회 / 경리 업무일지 조회 (월별·연간 집계 표는 같은 구조를 공유합니다) ---------- */
-#historyTable .month-row, #overviewTable .month-row, #acctOverviewTable .month-row { cursor: pointer; }
-#historyTable .month-row:hover, #overviewTable .month-row:hover, #acctOverviewTable .month-row:hover { background: var(--surface-soft); }
-#historyTable .month-row td, #overviewTable .month-row td, #acctOverviewTable .month-row td { font-weight: 700; }
-#historyTable .period-cell, #overviewTable .period-cell, #acctOverviewTable .period-cell { color: var(--navy); font-size: 15px; }
-#historyTable .expand-icon, #overviewTable .expand-icon, #acctOverviewTable .expand-icon {
+/* ---------- 작업내역 조회 / 경리 업무일지 조회 (월별·연간 집계 표는 같은 구조를 공유합니다) ----------
+   "작업 히스토리"(#historyTable)는 29차 요청부터 이 집계+펼치기 구조를 쓰지 않고, #recordsTable과
+   동일한 개별 내역 목록 형태로 바뀌었습니다(아래 "#col-tag" 및 레코드 목록 공용 스타일 참고). */
+#overviewTable .month-row, #acctOverviewTable .month-row { cursor: pointer; }
+#overviewTable .month-row:hover, #acctOverviewTable .month-row:hover { background: var(--surface-soft); }
+#overviewTable .month-row td, #acctOverviewTable .month-row td { font-weight: 700; }
+#overviewTable .period-cell, #acctOverviewTable .period-cell { color: var(--navy); font-size: 15px; }
+#overviewTable .expand-icon, #acctOverviewTable .expand-icon {
   display: inline-block;
   width: 15px;
   font-size: 11px;
   transition: transform 0.15s ease;
   color: var(--text-muted);
 }
-#historyTable .month-row.expanded .expand-icon, #overviewTable .month-row.expanded .expand-icon, #acctOverviewTable .month-row.expanded .expand-icon { transform: rotate(90deg); }
+#overviewTable .month-row.expanded .expand-icon, #acctOverviewTable .month-row.expanded .expand-icon { transform: rotate(90deg); }
 /* "현장별 보기 / 접기" 안내는 좁은 화면에서만 보여줍니다. */
-#historyTable .period-hint, #overviewTable .period-hint, #acctOverviewTable .period-hint { display: none; }
-#historyTable .site-detail-row, #overviewTable .site-detail-row, #acctOverviewTable .site-detail-row { cursor: pointer; }
-#historyTable .site-detail-row:hover td, #overviewTable .site-detail-row:hover td, #acctOverviewTable .site-detail-row:hover td { background: #eef2f8; }
-#historyTable .site-detail-row td, #overviewTable .site-detail-row td, #acctOverviewTable .site-detail-row td {
+#overviewTable .period-hint, #acctOverviewTable .period-hint { display: none; }
+#overviewTable .site-detail-row, #acctOverviewTable .site-detail-row { cursor: pointer; }
+#overviewTable .site-detail-row:hover td, #acctOverviewTable .site-detail-row:hover td { background: #eef2f8; }
+#overviewTable .site-detail-row td, #acctOverviewTable .site-detail-row td {
   background: var(--surface-soft);
   font-size: 13px;
   color: var(--text-muted);
@@ -688,13 +691,18 @@ td.site-badge {
   padding-top: 8px;
   padding-bottom: 8px;
 }
-#historyTable .site-detail-row .site-detail-name, #overviewTable .site-detail-row .site-detail-name, #acctOverviewTable .site-detail-row .site-detail-name {
+#overviewTable .site-detail-row .site-detail-name, #acctOverviewTable .site-detail-row .site-detail-name {
   color: var(--text);
   font-weight: 600;
   padding-left: 30px;
 }
-#historyTable .deficit, #overviewTable .deficit, #acctOverviewTable .deficit { color: var(--danger); font-weight: 700; }
-#historyTable .deficit-zero, #overviewTable .deficit-zero, #acctOverviewTable .deficit-zero { color: var(--good-text); font-weight: 700; }
+#overviewTable .deficit, #acctOverviewTable .deficit { color: var(--danger); font-weight: 700; }
+#overviewTable .deficit-zero, #acctOverviewTable .deficit-zero { color: var(--good-text); font-weight: 700; }
+
+/* 작업 히스토리: 통합 목록의 "구분" 태그 칸 */
+.col-tag { text-align: center; white-space: nowrap; }
+td.col-tag { text-align: center; white-space: nowrap; }
+.tag-badge.tag-work { background: #e8f1fc; color: #1d5fa8; }
 
 /* ---------- 모달 ---------- */
 .modal-overlay {
@@ -761,6 +769,7 @@ td.site-badge {
      같은 카드형 레이아웃을 여러 표(#recordsTable, #journalTable, #accountingTable,
      #followupTable, #overviewSearchTable, #acctOverviewSearchTable)가 함께 사용합니다. */
   #listSection .table-wrap,
+  #historyView .table-wrap,
   #journalSection .table-wrap,
   #workMemosSection .table-wrap,
   #accountingSection .table-wrap,
@@ -773,9 +782,10 @@ td.site-badge {
     border-radius: 0;
     box-shadow: none;
   }
-  #recordsTable, #journalTable, #workMemoTable, #accountingTable, #followupTable, #overviewSearchTable, #acctOverviewSearchTable, #siteAccountsTable, #scheduleTable, #siteRulesTable { min-width: 0; width: 100%; }
-  #recordsTable thead, #journalTable thead, #workMemoTable thead, #accountingTable thead, #followupTable thead, #overviewSearchTable thead, #acctOverviewSearchTable thead, #siteAccountsTable thead, #scheduleTable thead, #siteRulesTable thead { display: none; }
+  #recordsTable, #historyTable, #journalTable, #workMemoTable, #accountingTable, #followupTable, #overviewSearchTable, #acctOverviewSearchTable, #siteAccountsTable, #scheduleTable, #siteRulesTable { min-width: 0; width: 100%; }
+  #recordsTable thead, #historyTable thead, #journalTable thead, #workMemoTable thead, #accountingTable thead, #followupTable thead, #overviewSearchTable thead, #acctOverviewSearchTable thead, #siteAccountsTable thead, #scheduleTable thead, #siteRulesTable thead { display: none; }
   #recordsTable, #recordsTable tbody, #recordsTable tr, #recordsTable td,
+  #historyTable, #historyTable tbody, #historyTable tr, #historyTable td,
   #journalTable, #journalTable tbody, #journalTable tr, #journalTable td,
   #workMemoTable, #workMemoTable tbody, #workMemoTable tr, #workMemoTable td,
   #accountingTable, #accountingTable tbody, #accountingTable tr, #accountingTable td,
@@ -788,7 +798,7 @@ td.site-badge {
     display: block;
     width: 100%;
   }
-  #recordsTable tbody tr, #journalTable tbody tr, #workMemoTable tbody tr, #accountingTable tbody tr, #followupTable tbody tr, #overviewSearchTable tbody tr, #acctOverviewSearchTable tbody tr, #siteAccountsTable tbody tr, #scheduleTable tbody tr, #siteRulesTable tbody tr {
+  #recordsTable tbody tr, #historyTable tbody tr, #journalTable tbody tr, #workMemoTable tbody tr, #accountingTable tbody tr, #followupTable tbody tr, #overviewSearchTable tbody tr, #acctOverviewSearchTable tbody tr, #siteAccountsTable tbody tr, #scheduleTable tbody tr, #siteRulesTable tbody tr {
     /* 위쪽의 일괄 width:100% 규칙 + 아래 margin 이 합쳐지면 카드가 좌우로
        margin 만큼 컨테이너 밖으로 삐져나가므로 width 를 auto 로 되돌립니다. */
     width: auto;
@@ -800,9 +810,9 @@ td.site-badge {
     overflow: hidden;
     box-shadow: var(--shadow);
   }
-  #recordsTable tbody tr.paid-row, #followupTable tbody tr.paid-row, #acctOverviewSearchTable tbody tr.paid-row, #workMemoTable tbody tr.paid-row { border-color: var(--paid-row-border); }
+  #recordsTable tbody tr.paid-row, #historyTable tbody tr.paid-row, #followupTable tbody tr.paid-row, #acctOverviewSearchTable tbody tr.paid-row, #workMemoTable tbody tr.paid-row { border-color: var(--paid-row-border); }
   #followupTable tbody tr.overdue-row, #scheduleTable tbody tr.overdue-row { border-color: #f4c6c6; }
-  #recordsTable tbody td, #journalTable tbody td, #workMemoTable tbody td, #accountingTable tbody td, #followupTable tbody td, #overviewSearchTable tbody td, #acctOverviewSearchTable tbody td, #siteAccountsTable tbody td, #scheduleTable tbody td, #siteRulesTable tbody td {
+  #recordsTable tbody td, #historyTable tbody td, #journalTable tbody td, #workMemoTable tbody td, #accountingTable tbody td, #followupTable tbody td, #overviewSearchTable tbody td, #acctOverviewSearchTable tbody td, #siteAccountsTable tbody td, #scheduleTable tbody td, #siteRulesTable tbody td {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -812,6 +822,7 @@ td.site-badge {
     white-space: normal;
   }
   #recordsTable tbody tr td:last-child,
+  #historyTable tbody tr td:last-child,
   #journalTable tbody tr td:last-child,
   #workMemoTable tbody tr td:last-child,
   #accountingTable tbody tr td:last-child,
@@ -821,7 +832,7 @@ td.site-badge {
   #siteAccountsTable tbody tr td:last-child,
   #scheduleTable tbody tr td:last-child,
   #siteRulesTable tbody tr td:last-child { border-bottom: none; }
-  #recordsTable tbody td::before, #journalTable tbody td::before, #workMemoTable tbody td::before, #accountingTable tbody td::before, #followupTable tbody td::before, #overviewSearchTable tbody td::before, #acctOverviewSearchTable tbody td::before, #siteAccountsTable tbody td::before, #scheduleTable tbody td::before, #siteRulesTable tbody td::before {
+  #recordsTable tbody td::before, #historyTable tbody td::before, #journalTable tbody td::before, #workMemoTable tbody td::before, #accountingTable tbody td::before, #followupTable tbody td::before, #overviewSearchTable tbody td::before, #acctOverviewSearchTable tbody td::before, #siteAccountsTable tbody td::before, #scheduleTable tbody td::before, #siteRulesTable tbody td::before {
     content: attr(data-label);
     font-size: 12px;
     font-weight: 700;
@@ -832,6 +843,7 @@ td.site-badge {
   /* 값 부분(.cell-value)은 라벨과 함께 flex 항목으로 배치하고,
      min-width:0 을 줘서 카드 밖으로 넘치지 않게 합니다. */
   #recordsTable tbody td > .cell-value,
+  #historyTable tbody td > .cell-value,
   #journalTable tbody td > .cell-value,
   #workMemoTable tbody td > .cell-value,
   #accountingTable tbody td > .cell-value,
@@ -847,11 +859,12 @@ td.site-badge {
     overflow-wrap: break-word;
     word-break: keep-all;
   }
-  #recordsTable td.site-badge, #journalTable td.site-badge, #workMemoTable td.site-badge, #accountingTable td.site-badge, #followupTable td.site-badge, #overviewSearchTable td.site-badge, #acctOverviewSearchTable td.site-badge, #siteAccountsTable td.site-badge, #scheduleTable td.site-badge, #siteRulesTable td.site-badge {
+  #recordsTable td.site-badge, #historyTable td.site-badge, #journalTable td.site-badge, #workMemoTable td.site-badge, #accountingTable td.site-badge, #followupTable td.site-badge, #overviewSearchTable td.site-badge, #acctOverviewSearchTable td.site-badge, #siteAccountsTable td.site-badge, #scheduleTable td.site-badge, #siteRulesTable td.site-badge {
     font-size: 16px;
     color: var(--navy);
   }
   #recordsTable td.content-cell,
+  #historyTable td.content-cell,
   #journalTable td.content-cell-wide,
   #workMemoTable td.content-cell-wide,
   #accountingTable td.content-cell-wide,
@@ -865,14 +878,14 @@ td.site-badge {
     text-overflow: initial;
     white-space: normal;
   }
-  #recordsTable td.col-manage::before, #journalTable td.col-manage::before, #workMemoTable td.col-manage::before, #accountingTable td.col-manage::before, #followupTable td.col-manage::before, #siteAccountsTable td.col-manage::before, #scheduleTable td.col-manage::before, #siteRulesTable td.col-manage::before {
+  #recordsTable td.col-manage::before, #historyTable td.col-manage::before, #journalTable td.col-manage::before, #workMemoTable td.col-manage::before, #accountingTable td.col-manage::before, #followupTable td.col-manage::before, #siteAccountsTable td.col-manage::before, #scheduleTable td.col-manage::before, #siteRulesTable td.col-manage::before {
     content: none;
   }
-  #recordsTable td.col-manage, #journalTable td.col-manage, #workMemoTable td.col-manage, #accountingTable td.col-manage, #followupTable td.col-manage, #siteAccountsTable td.col-manage, #scheduleTable td.col-manage, #siteRulesTable td.col-manage { justify-content: flex-end; }
+  #recordsTable td.col-manage, #historyTable td.col-manage, #journalTable td.col-manage, #workMemoTable td.col-manage, #accountingTable td.col-manage, #followupTable td.col-manage, #siteAccountsTable td.col-manage, #scheduleTable td.col-manage, #siteRulesTable td.col-manage { justify-content: flex-end; }
   /* No. 열은 카드형 레이아웃에서는 순서가 위->아래로 이미 드러나므로 굳이 표시하지 않습니다. */
   #journalTable td.col-no, #workMemoTable td.col-no, #accountingTable td.col-no, #followupTable td.col-no, #siteAccountsTable td.col-no, #scheduleTable td.col-no { display: none; }
-  #recordsTable .edit-input, #journalTable .edit-input, #accountingTable .edit-input, #followupTable .edit-input, #siteAccountsTable .edit-input { width: auto; max-width: 200px; margin-left: auto; }
-  #recordsTable select.edit-input, #journalTable select.edit-input, #accountingTable select.edit-input, #followupTable select.edit-input { min-width: 0; }
+  #recordsTable .edit-input, #historyTable .edit-input, #journalTable .edit-input, #accountingTable .edit-input, #followupTable .edit-input, #siteAccountsTable .edit-input { width: auto; max-width: 200px; margin-left: auto; }
+  #recordsTable select.edit-input, #historyTable select.edit-input, #journalTable select.edit-input, #accountingTable select.edit-input, #followupTable select.edit-input { min-width: 0; }
 
   /* 현장별 1년 스케줄표: 모바일 카드형 레이아웃에서도 "월분별 조회" 그룹 헤더는
      일반 행(카드) 스타일이 아니라 얇은 구분 바 형태로 보이도록 재정의합니다. */
@@ -893,9 +906,9 @@ td.site-badge {
     content: none;
   }
 
-  /* 작업 내역 / 소독 / 저수조 청소: 모바일 카드형 레이아웃에서도 월별 그룹 헤더는
-     일반 행(카드) 스타일이 아니라 얇은 구분 바 형태로 보이도록 재정의합니다. */
-  #recordsTable tbody tr.record-month-header {
+  /* 작업 내역 / 소독 / 저수조 청소(#recordsTable) / 작업 히스토리(#historyTable): 모바일 카드형
+     레이아웃에서도 월별 그룹 헤더는 일반 행(카드) 스타일이 아니라 얇은 구분 바 형태로 보이도록 재정의합니다. */
+  #recordsTable tbody tr.record-month-header, #historyTable tbody tr.record-month-header {
     background: transparent;
     border: none;
     box-shadow: none;
@@ -903,12 +916,12 @@ td.site-badge {
     margin: 14px 0 6px;
     padding: 0;
   }
-  #recordsTable tbody tr.record-month-header td {
+  #recordsTable tbody tr.record-month-header td, #historyTable tbody tr.record-month-header td {
     display: block;
     padding: 6px 10px;
     border-bottom: none;
   }
-  #recordsTable tbody tr.record-month-header td::before {
+  #recordsTable tbody tr.record-month-header td::before, #historyTable tbody tr.record-month-header td::before {
     content: none;
   }
 

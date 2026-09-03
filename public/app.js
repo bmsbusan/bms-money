@@ -48,13 +48,16 @@
   const historyEmptyMsg = $("#historyEmptyMsg");
   const historyModeMonthBtn = $("#historyModeMonthBtn");
   const historyModeYearBtn = $("#historyModeYearBtn");
-  const historyPeriodHeader = $("#historyPeriodHeader");
   const historyFilterCategory = $("#historyFilterCategory");
   const historyFilterSite = $("#historyFilterSite");
+  const histSumTotal = $("#histSumTotal");
+  const histSumUnbilled = $("#histSumUnbilled");
+  const histSumUnpaid = $("#histSumUnpaid");
+  const histSumPaidCost = $("#histSumPaidCost");
 
   const recordsBody = $("#recordsBody");
   const emptyMsg = $("#emptyMsg");
-  const sortableHeaders = $$("#recordsTable thead th.sortable");
+  const sortableHeaders = $$("#recordsTable thead th.sortable, #historyTable thead th.sortable");
 
   const sumTotal = $("#sumTotal");
   const sumUnbilled = $("#sumUnbilled");
@@ -271,7 +274,7 @@
   let editingId = null;
   let pollTimer = null;
   let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "workMemos" | "accounting" | "accountingOverview" | "followup" | "overview" | "siteAccounts" | "siteSchedules"
-  let historyRows = [];
+  let historyRecords = []; // 작업 내역/소독/저수조 청소 통합 원본 목록(구분 필터·현장 필터만 서버에 적용된 상태)
   let historyMode = "month"; // "month" | "year"
   let sortKey = null; // null | "site_name" | "work_date"
   let sortDir = "asc"; // "asc" | "desc"
@@ -406,7 +409,7 @@
     });
 
     if (tab === "history") {
-      loadMonthlySummary();
+      loadHistoryRecords();
     } else if (tab === "journal") {
       loadJournal();
     } else if (tab === "workMemos") {
@@ -457,7 +460,8 @@
 
   function refreshActiveTab() {
     if (activeTab === "history") {
-      loadMonthlySummary();
+      // "작업 내역" 탭과 마찬가지로 인라인 수정 중에는 표가 다시 그려지지 않게 합니다.
+      if (editingId === null) loadHistoryRecords();
     } else if (activeTab === "journal") {
       if (editingJournalId === null) loadJournal();
     } else if (activeTab === "workMemos") {
@@ -697,9 +701,22 @@
         sortKey = null; // 세 번째 클릭 -> 정렬 해제, 기본 순서로 복귀
       }
       updateSortHeaders();
-      renderRecords();
+      renderCurrentRecordsView();
     });
   });
+
+  // "작업 내역/소독/저수조 청소"(recordsBody)와 "작업 히스토리"(historyBody)는 같은
+  // records 데이터를 다른 방식(단일 구분 필터 / 통합+구분 태그)으로 보여주는 화면이라,
+  // 지금 화면에 보이는 쪽만 다시 그립니다.
+  function renderCurrentRecordsView() {
+    if (activeTab === "history") renderHistory();
+    else renderRecords();
+  }
+
+  async function refreshCurrentRecordsView() {
+    if (activeTab === "history") await loadHistoryRecords();
+    else await loadRecords();
+  }
 
   function renderRecords() {
     if (records.length === 0) {
@@ -795,7 +812,9 @@
       </tr>`;
   }
 
-  recordsBody.addEventListener("change", async (e) => {
+  // 아래 두 핸들러는 "작업 내역/소독/저수조 청소"(recordsBody)와 "작업 히스토리"(historyBody)에
+  // 공통으로 붙여 씁니다 — 둘 다 같은 records 데이터를 다루므로 수정/삭제/토글 동작이 동일합니다.
+  async function onRecordsBodyChange(e) {
     const action = e.target.getAttribute("data-action");
     const id = e.target.getAttribute("data-id");
     if (!action || !id) return;
@@ -809,19 +828,19 @@
     } else if (action === "change-bank") {
       await patchRecord(id, { bank_account: e.target.value });
     }
-  });
+  }
 
-  recordsBody.addEventListener("click", async (e) => {
+  async function onRecordsBodyClick(e) {
     const action = e.target.getAttribute("data-action");
     const id = e.target.getAttribute("data-id");
     if (!action || !id) return;
 
     if (action === "edit") {
       editingId = Number(id);
-      renderRecords();
+      renderCurrentRecordsView();
     } else if (action === "cancel-edit") {
       editingId = null;
-      renderRecords();
+      renderCurrentRecordsView();
     } else if (action === "save-edit") {
       const row = e.target.closest("tr");
       const patch = {
@@ -837,7 +856,7 @@
       try {
         await patchRecord(id, patch, false);
         editingId = null;
-        await loadRecords();
+        await refreshCurrentRecordsView();
       } catch (err) {
         alert(err.message);
       }
@@ -845,16 +864,21 @@
       if (!confirm("이 내역을 삭제할까요?")) return;
       try {
         await api(`/api/records/${id}`, { method: "DELETE" });
-        await loadRecords();
+        await refreshCurrentRecordsView();
       } catch (err) {
         alert(err.message);
       }
     }
-  });
+  }
+
+  recordsBody.addEventListener("change", onRecordsBodyChange);
+  recordsBody.addEventListener("click", onRecordsBodyClick);
+  historyBody.addEventListener("change", onRecordsBodyChange);
+  historyBody.addEventListener("click", onRecordsBodyClick);
 
   async function patchRecord(id, patch, refresh = true) {
     await api(`/api/records/${id}`, { method: "PUT", body: JSON.stringify(patch) });
-    if (refresh) await loadRecords();
+    if (refresh) await refreshCurrentRecordsView();
   }
 
   // ---------- 새 내역 추가 ----------
@@ -916,11 +940,33 @@
     }
   });
 
-  // ---------- 월별 히스토리 ----------
+  // ---------- 작업 히스토리 (작업 내역/소독/저수조 청소 통합 조회) ----------
+  // "작업 내역" 탭과 완전히 같은 형식(현장명/작업일/내용/비용/품의/입금/입금일/입금 통장/관리)으로,
+  // 세 카테고리를 구분 태그(🛠️작업/😷소독/💧저수조청소)로 표시하며 한 목록에서 함께 봅니다.
 
-  async function loadMonthlySummary() {
-    const data = await api("/api/monthly-summary");
-    historyRows = data.rows || [];
+  const HISTORY_CATEGORY_TAG_CLASS = {
+    "작업내역": "work",
+    "소독": "disinfect",
+    "저수조청소": "tank",
+  };
+  const HISTORY_CATEGORY_TAG_LABEL = {
+    "작업내역": "🛠️작업",
+    "소독": "😷소독",
+    "저수조청소": "💧저수조청소",
+  };
+
+  function historyCategoryBadgeHtml(category) {
+    const cls = HISTORY_CATEGORY_TAG_CLASS[category] || "etc";
+    const label = HISTORY_CATEGORY_TAG_LABEL[category] || category || "-";
+    return `<span class="tag-badge tag-${cls}">${escapeHtml(label)}</span>`;
+  }
+
+  async function loadHistoryRecords() {
+    const params = new URLSearchParams();
+    if (historyFilterSite.value) params.set("site", historyFilterSite.value);
+    if (historyFilterCategory.value) params.set("category", historyFilterCategory.value);
+    const data = await api(`/api/records?${params.toString()}`);
+    historyRecords = data.records;
     renderHistory();
   }
 
@@ -928,123 +974,129 @@
     historyMode = mode;
     historyModeMonthBtn.classList.toggle("subtab-active", mode === "month");
     historyModeYearBtn.classList.toggle("subtab-active", mode === "year");
-    historyPeriodHeader.textContent = mode === "month" ? "월" : "연도";
     renderHistory();
   }
   historyModeMonthBtn.addEventListener("click", () => switchHistoryMode("month"));
   historyModeYearBtn.addEventListener("click", () => switchHistoryMode("year"));
-  historyFilterSite.addEventListener("change", () => {
-    renderHistory();
-  });
-  historyFilterCategory.addEventListener("change", () => {
-    renderHistory();
-  });
+  historyFilterSite.addEventListener("change", loadHistoryRecords);
+  historyFilterCategory.addEventListener("change", loadHistoryRecords);
+
+  // "월별"이면 작업일 기준 "YYYY-MM", "연도별"이면 "YYYY"로 묶습니다.
+  function historyGroupKey(r) {
+    const key = recordMonthKey(r);
+    if (!key) return "";
+    return historyMode === "year" ? key.slice(0, 4) : key;
+  }
+  function historyGroupLabel(key) {
+    if (!key) return "작업일 미상";
+    return historyMode === "year" ? `${key}년` : recordMonthLabel(key);
+  }
+
+  function renderHistorySummary() {
+    const total = historyRecords.length;
+    const unbilled = historyRecords.filter((r) => !r.billed).length;
+    const unpaid = historyRecords.filter((r) => !r.paid).length;
+    const paidCostSum = historyRecords.filter((r) => r.paid).reduce((s, r) => s + (r.cost || 0), 0);
+    histSumTotal.textContent = total;
+    histSumUnbilled.textContent = unbilled;
+    histSumUnpaid.textContent = unpaid;
+    histSumPaidCost.textContent = won(paidCostSum);
+  }
 
   function renderHistory() {
-    const siteFilter = historyFilterSite.value;
-    const categoryFilter = historyFilterCategory.value;
-    const filteredRows = historyRows.filter((r) => {
-      if (siteFilter && r.site_name !== siteFilter) return false;
-      if (categoryFilter && r.category !== categoryFilter) return false;
-      return true;
-    });
-
-    if (filteredRows.length === 0) {
+    renderHistorySummary();
+    if (historyRecords.length === 0) {
       historyBody.innerHTML = "";
       historyEmptyMsg.classList.remove("hidden");
       return;
     }
     historyEmptyMsg.classList.add("hidden");
 
-    // 월별 또는 연도별로 묶기 (연도별은 월별 데이터를 다시 합산)
-    const byPeriod = new Map();
-    for (const row of filteredRows) {
-      const m = row.month || "미상";
-      const key = historyMode === "year" ? m.slice(0, 4) || "미상" : m;
-      if (!byPeriod.has(key)) {
-        byPeriod.set(key, { period: key, count: 0, billed_total: 0, paid_total: 0, sitesMap: new Map() });
-      }
-      const bucket = byPeriod.get(key);
-      bucket.count += row.count;
-      // 청구금액 합계는 "품의 올림" 체크 여부와 상관없이, 등록된 전체 비용을 기준으로 집계합니다.
-      bucket.billed_total += row.cost_total || 0;
-      bucket.paid_total += row.paid_total || 0;
+    // 작업일 기준 월(또는 연도)별로 묶고, 그룹은 최신 순으로 정렬합니다("작업일 미상"은 항상 맨 뒤).
+    const groups = new Map();
+    historyRecords.forEach((r) => {
+      const key = historyGroupKey(r);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    });
+    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+      if (a === b) return 0;
+      if (a === "") return 1;
+      if (b === "") return -1;
+      return a < b ? 1 : -1;
+    });
 
-      // 연도별일 때는 같은 현장이 여러 달에 걸쳐 나올 수 있으므로 현장 기준으로 다시 합산
-      const s = bucket.sitesMap.get(row.site_name) || {
-        site_name: row.site_name, count: 0, billed_total: 0, paid_total: 0, paid_count: 0,
-      };
-      s.count += row.count;
-      s.billed_total += row.cost_total || 0;
-      s.paid_total += row.paid_total || 0;
-      s.paid_count += row.paid_count || 0;
-      bucket.sitesMap.set(row.site_name, s);
-    }
-
-    const periods = Array.from(byPeriod.values()).sort((a, b) => (a.period < b.period ? 1 : -1));
-
-    historyBody.innerHTML = periods
-      .map((m) => {
-        const deficit = m.billed_total - m.paid_total;
-        const siteRows = Array.from(m.sitesMap.values());
-        // 미수금이 남아있는(미완료) 현장을 먼저, 완납(완료)된 현장은 아래로 — 각 그룹 안에서는 가나다순
-        const undoneSiteRows = siteRows
-          .filter((s) => (s.billed_total || 0) - (s.paid_total || 0) > 0)
-          .sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
-        const doneSiteRows = siteRows
-          .filter((s) => (s.billed_total || 0) - (s.paid_total || 0) <= 0)
-          .sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
-        const sortedSiteRows = [...undoneSiteRows, ...doneSiteRows];
-        const detailRows = sortedSiteRows
-          .map(
-            (s, i) => `
-              <tr class="site-detail-row ${i === sortedSiteRows.length - 1 ? "last-detail" : ""}" data-period="${m.period}" data-site="${escapeHtml(s.site_name)}">
-                <td class="site-detail-name" data-label="현장명"><span class="cell-value">${escapeHtml(s.site_name)}</span></td>
-                <td class="col-cost" data-label="작업 건수"><span class="cell-value">${s.count}건</span></td>
-                <td class="col-cost" data-label="청구금액"><span class="cell-value">${won(s.billed_total)} (${s.count}건)</span></td>
-                <td class="col-cost" data-label="입금금액"><span class="cell-value">${won(s.paid_total)} (${s.paid_count}건)</span></td>
-                <td class="col-cost" data-label="미수금"><span class="cell-value">${won((s.billed_total || 0) - (s.paid_total || 0))}</span></td>
-              </tr>`
-          )
-          .join("");
-        const periodLabel = historyMode === "year" ? m.period + "년" : m.period;
-        return `
-          <tr class="month-row" data-period="${m.period}">
-            <td class="period-cell" data-label="${historyMode === "year" ? "연도" : "월"}">
-              <span class="cell-value">${escapeHtml(periodLabel)}</span>
-            </td>
-            <td class="col-cost" data-label="작업 건수"><span class="cell-value">${m.count}건</span></td>
-            <td class="col-cost" data-label="청구금액 합계"><span class="cell-value">${won(m.billed_total)}</span></td>
-            <td class="col-cost" data-label="입금금액 합계"><span class="cell-value">${won(m.paid_total)}</span></td>
-            <td class="col-cost ${deficit > 0 ? "deficit" : "deficit-zero"}" data-label="미수금"><span class="cell-value">${won(deficit)}</span></td>
-          </tr>
-          ${detailRows}`;
-      })
-      .join("");
+    const cmp = recordComparator();
+    const parts = [];
+    sortedKeys.forEach((key) => {
+      const group = groups.get(key);
+      // 같은 그룹 안에서는 입금 대기 항목을 먼저, 입금 완료 항목은 아래로 배치합니다.
+      const unpaid = group.filter((r) => !r.paid).sort(cmp);
+      const paid = group.filter((r) => r.paid).sort(cmp);
+      parts.push(`<tr class="record-month-header"><td colspan="10">${escapeHtml(historyGroupLabel(key))}</td></tr>`);
+      [...unpaid, ...paid].forEach((r) => {
+        parts.push(editingId === r.id ? historyEditRowHtml(r) : historyViewRowHtml(r));
+      });
+    });
+    historyBody.innerHTML = parts.join("");
   }
 
-  historyBody.addEventListener("click", (e) => {
-    // 현장별 상세 줄을 누르면 그 달 + 그 현장의 실제 내역으로 이동
-    const detail = e.target.closest(".site-detail-row");
-    if (detail) {
-      if (historyMode === "year") return;
-      filterMonth.value = detail.getAttribute("data-period");
-      filterSite.value = detail.getAttribute("data-site") || "";
-      switchTab(historyFilterCategory.value || "작업내역");
-      return;
-    }
+  function historyViewRowHtml(r) {
+    return `
+      <tr class="${r.paid ? "paid-row" : ""}" data-id="${r.id}">
+        <td class="col-tag" data-label="구분"><span class="cell-value">${historyCategoryBadgeHtml(r.category)}</span></td>
+        <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
+        <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+        <td class="content-cell" data-label="내용" title="${escapeHtml(r.content)}"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
+        <td class="col-cost" data-label="비용"><span class="cell-value">${won(r.cost)}</span></td>
+        <td class="col-check" data-label="품의">
+          <span class="cell-value">${toggleChipHtml("toggle-billed", r.id, r.billed)}</span>
+        </td>
+        <td class="col-check" data-label="입금">
+          <span class="cell-value">${toggleChipHtml("toggle-paid", r.id, r.paid)}</span>
+        </td>
+        <td class="col-date" data-label="입금일">
+          <input type="date" class="edit-input" data-action="change-date" data-id="${r.id}" value="${r.paid_date || ""}" />
+        </td>
+        <td class="col-bank" data-label="입금 통장">
+          <select class="edit-input" data-action="change-bank" data-id="${r.id}">${bankAccountOptionsHtml(r.bank_account)}</select>
+        </td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-ghost btn-sm" data-action="edit" data-id="${r.id}">수정</button>
+            <button class="btn btn-danger btn-sm" data-action="delete" data-id="${r.id}">삭제</button>
+          </span>
+        </td>
+      </tr>`;
+  }
 
-    const row = e.target.closest(".month-row");
-    if (!row) return;
-    if (historyMode === "year") return; // 연도별 화면은 월 단위 필터가 없어 행 클릭 동작이 없습니다.
-    const period = row.getAttribute("data-period");
-
-    // 월 행 클릭 -> 해당 구분 탭으로 이동해서 그 월(및 현장 필터 중이면 그 현장)로 필터링
-    // (히스토리에서 구분을 선택하지 않은 상태라면 기본으로 "작업내역" 탭으로 이동합니다)
-    filterMonth.value = period;
-    filterSite.value = historyFilterSite.value || "";
-    switchTab(historyFilterCategory.value || "작업내역");
-  });
+  function historyEditRowHtml(r) {
+    const siteOpts = sites
+      .map((s) => `<option value="${escapeHtml(s.name)}" ${s.name === r.site_name ? "selected" : ""}>${escapeHtml(s.name)}</option>`)
+      .join("");
+    return `
+      <tr data-id="${r.id}">
+        <td class="col-tag" data-label="구분"><span class="cell-value">${historyCategoryBadgeHtml(r.category)}</span></td>
+        <td data-label="현장명"><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
+        <td class="col-date" data-label="작업일"><input class="edit-input" type="date" data-edit="work_date" value="${r.work_date || ""}" /></td>
+        <td data-label="내용"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
+        <td class="col-cost" data-label="비용"><input class="edit-input" type="number" min="0" data-edit="cost" value="${r.cost}" /></td>
+        <td class="col-check" data-label="품의">
+          <span class="cell-value">${toggleChipEditHtml("billed", r.billed)}</span>
+        </td>
+        <td class="col-check" data-label="입금">
+          <span class="cell-value">${toggleChipEditHtml("paid", r.paid)}</span>
+        </td>
+        <td class="col-date" data-label="입금일"><input class="edit-input" type="date" data-edit="paid_date" value="${r.paid_date || ""}" /></td>
+        <td class="col-bank" data-label="입금 통장"><select class="edit-input" data-edit="bank_account">${bankAccountOptionsHtml(r.bank_account)}</select></td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-primary btn-sm" data-action="save-edit" data-id="${r.id}">저장</button>
+            <button class="btn btn-ghost btn-sm" data-action="cancel-edit" data-id="${r.id}">취소</button>
+          </span>
+        </td>
+      </tr>`;
+  }
 
   // ================= 업무일지 (현장명 / 작업내역 / 비고) =================
 
@@ -2489,9 +2541,10 @@
     if (followupFilterSite.value) params.set("site", followupFilterSite.value);
     if (followupFilterStatus.value !== "") params.set("status", followupFilterStatus.value);
     const data = await api(`/api/followups?${params.toString()}`);
-    followupEntries = data.followups;
-    // 현장명 가나다순으로 정렬(같은 현장 안에서는 서버가 내려준 순서(완료여부/예정일 등)를 그대로 유지)
-    followupEntries.sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
+    // 미완료 항목을 먼저(가나다순), 완료 항목은 아래로(가나다순) 2단 정렬합니다.
+    const undone = data.followups.filter((r) => !r.status).sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
+    const done = data.followups.filter((r) => r.status).sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
+    followupEntries = [...undone, ...done];
     if (followupView === "calendar") {
       renderFollowupCalendar();
     } else {
