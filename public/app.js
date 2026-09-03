@@ -272,7 +272,6 @@
   let pollTimer = null;
   let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "workMemos" | "accounting" | "accountingOverview" | "followup" | "overview" | "siteAccounts" | "siteSchedules"
   let historyRows = [];
-  let expandedMonths = new Set();
   let historyMode = "month"; // "month" | "year"
   let sortKey = null; // null | "site_name" | "work_date"
   let sortDir = "asc"; // "asc" | "desc"
@@ -885,17 +884,14 @@
     historyModeMonthBtn.classList.toggle("subtab-active", mode === "month");
     historyModeYearBtn.classList.toggle("subtab-active", mode === "year");
     historyPeriodHeader.textContent = mode === "month" ? "월" : "연도";
-    expandedMonths.clear();
     renderHistory();
   }
   historyModeMonthBtn.addEventListener("click", () => switchHistoryMode("month"));
   historyModeYearBtn.addEventListener("click", () => switchHistoryMode("year"));
   historyFilterSite.addEventListener("change", () => {
-    expandedMonths.clear();
     renderHistory();
   });
   historyFilterCategory.addEventListener("change", () => {
-    expandedMonths.clear();
     renderHistory();
   });
 
@@ -945,27 +941,32 @@
     historyBody.innerHTML = periods
       .map((m) => {
         const deficit = m.billed_total - m.paid_total;
-        const isExpanded = expandedMonths.has(m.period);
-        const siteRows = Array.from(m.sitesMap.values()).sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
-        const detailRows = isExpanded
-          ? siteRows
-              .map(
-                (s, i) => `
-              <tr class="site-detail-row ${i === siteRows.length - 1 ? "last-detail" : ""}" data-period="${m.period}" data-site="${escapeHtml(s.site_name)}">
+        const siteRows = Array.from(m.sitesMap.values());
+        // 미수금이 남아있는(미완료) 현장을 먼저, 완납(완료)된 현장은 아래로 — 각 그룹 안에서는 가나다순
+        const undoneSiteRows = siteRows
+          .filter((s) => (s.billed_total || 0) - (s.paid_total || 0) > 0)
+          .sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
+        const doneSiteRows = siteRows
+          .filter((s) => (s.billed_total || 0) - (s.paid_total || 0) <= 0)
+          .sort((a, b) => a.site_name.localeCompare(b.site_name, "ko"));
+        const sortedSiteRows = [...undoneSiteRows, ...doneSiteRows];
+        const detailRows = sortedSiteRows
+          .map(
+            (s, i) => `
+              <tr class="site-detail-row ${i === sortedSiteRows.length - 1 ? "last-detail" : ""}" data-period="${m.period}" data-site="${escapeHtml(s.site_name)}">
                 <td class="site-detail-name" data-label="현장명"><span class="cell-value">${escapeHtml(s.site_name)}</span></td>
                 <td class="col-cost" data-label="작업 건수"><span class="cell-value">${s.count}건</span></td>
                 <td class="col-cost" data-label="청구금액"><span class="cell-value">${won(s.billed_total)} (${s.count}건)</span></td>
                 <td class="col-cost" data-label="입금금액"><span class="cell-value">${won(s.paid_total)} (${s.paid_count}건)</span></td>
                 <td class="col-cost" data-label="미수금"><span class="cell-value">${won((s.billed_total || 0) - (s.paid_total || 0))}</span></td>
               </tr>`
-              )
-              .join("")
-          : "";
+          )
+          .join("");
         const periodLabel = historyMode === "year" ? m.period + "년" : m.period;
         return `
-          <tr class="month-row ${isExpanded ? "expanded" : ""}" data-period="${m.period}">
+          <tr class="month-row" data-period="${m.period}">
             <td class="period-cell" data-label="${historyMode === "year" ? "연도" : "월"}">
-              <span class="expand-icon">▶</span><span class="cell-value">${escapeHtml(periodLabel)}</span><span class="period-hint">${isExpanded ? "접기" : "현장별 보기"}</span>
+              <span class="cell-value">${escapeHtml(periodLabel)}</span>
             </td>
             <td class="col-cost" data-label="작업 건수"><span class="cell-value">${m.count}건</span></td>
             <td class="col-cost" data-label="청구금액 합계"><span class="cell-value">${won(m.billed_total)}</span></td>
@@ -990,23 +991,8 @@
 
     const row = e.target.closest(".month-row");
     if (!row) return;
+    if (historyMode === "year") return; // 연도별 화면은 월 단위 필터가 없어 행 클릭 동작이 없습니다.
     const period = row.getAttribute("data-period");
-
-    // 기간 칸(펼침 아이콘이 있는 칸)을 누르면 현장별 상세 펼치기/접기
-    if (e.target.closest(".period-cell")) {
-      if (expandedMonths.has(period)) expandedMonths.delete(period);
-      else expandedMonths.add(period);
-      renderHistory();
-      return;
-    }
-
-    if (historyMode === "year") {
-      // 연도별 화면에서는 목록에 연도 단위 필터가 없으므로, 행 클릭으로도 상세를 펼치고/접습니다.
-      if (expandedMonths.has(period)) expandedMonths.delete(period);
-      else expandedMonths.add(period);
-      renderHistory();
-      return;
-    }
 
     // 월 행 클릭 -> 해당 구분 탭으로 이동해서 그 월(및 현장 필터 중이면 그 현장)로 필터링
     // (히스토리에서 구분을 선택하지 않은 상태라면 기본으로 "작업내역" 탭으로 이동합니다)
