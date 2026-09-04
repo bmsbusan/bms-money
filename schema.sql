@@ -176,6 +176,26 @@ CREATE INDEX IF NOT EXISTS idx_work_memos_site ON work_memos(site_name);
 CREATE INDEX IF NOT EXISTS idx_work_memos_done ON work_memos(done);
 
 -- ============================================================
+-- 민원 일지 (경리 업무일지와 같은 형태이나 마감기한 없이:
+-- 작업일 / 현장명 / 내용 / 처리결과 / 완료 여부만 기록. 자동 이월・지난 완료건 숨김 없음 —
+-- 완료된 내역도 항상 이 화면에서 그대로 조회 가능, 월별로 그룹핑해서 조회)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS complaint_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  work_date TEXT NOT NULL,             -- 작업일 YYYY-MM-DD
+  site_name TEXT NOT NULL,
+  content TEXT DEFAULT '',             -- 민원 내용
+  result TEXT DEFAULT '',              -- 처리결과
+  done INTEGER NOT NULL DEFAULT 0,     -- 완료 여부 (0/1)
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_complaint_logs_date ON complaint_logs(work_date);
+CREATE INDEX IF NOT EXISTS idx_complaint_logs_site ON complaint_logs(site_name);
+CREATE INDEX IF NOT EXISTS idx_complaint_logs_done ON complaint_logs(done);
+
+-- ============================================================
 -- 현장별 1년 스케줄표 (보험 만기, 법정 점검, 소독, 저수조청소 등 현장별 반복 일정 관리)
 -- 사용자가 업로드한 "현장별 1년 스케줄표.xlsx"(현장별 스케줄표 시트, 187건)를 초기 데이터로 반영.
 -- 만기 도래일(due_date)은 화면에서 언제든 직접 입력/수정 가능. 해당 없음(-)인 항목은 NULL로 저장.

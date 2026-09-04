@@ -113,6 +113,24 @@
   const workMemoBody = $("#workMemoBody");
   const workMemoEmptyMsg = $("#workMemoEmptyMsg");
 
+  const complaintsSection = $("#complaintsSection");
+  const complaintFilterSite = $("#complaintFilterSite");
+  const complaintFilterDate = $("#complaintFilterDate");
+  const complaintFilterDone = $("#complaintFilterDone");
+  const complaintFilterResetBtn = $("#complaintFilterResetBtn");
+  const addComplaintBtn = $("#addComplaintBtn");
+  const complaintAddForm = $("#complaintAddForm");
+  const newComplaintDate = $("#newComplaintDate");
+  const newComplaintSite = $("#newComplaintSite");
+  const newComplaintContent = $("#newComplaintContent");
+  const newComplaintResult = $("#newComplaintResult");
+  const newComplaintDone = $("#newComplaintDone");
+  const saveComplaintBtn = $("#saveComplaintBtn");
+  const cancelComplaintBtn = $("#cancelComplaintBtn");
+  const complaintAddError = $("#complaintAddError");
+  const complaintBody = $("#complaintBody");
+  const complaintEmptyMsg = $("#complaintEmptyMsg");
+
   // ---------- 경리 업무일지 화면 요소 ----------
   const accountingSection = $("#accountingSection");
   const accountingFilterSite = $("#accountingFilterSite");
@@ -273,7 +291,7 @@
   let records = [];
   let editingId = null;
   let pollTimer = null;
-  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "workMemos" | "accounting" | "accountingOverview" | "followup" | "overview" | "siteAccounts" | "siteSchedules"
+  let activeTab = "작업내역"; // "작업내역" | "소독" | "저수조청소" | "history" | "journal" | "workMemos" | "complaints" | "accounting" | "accountingOverview" | "followup" | "overview" | "siteAccounts" | "siteSchedules"
   let historyRecords = []; // 작업 내역/소독/저수조 청소 통합 원본 목록(구분 필터·현장 필터만 서버에 적용된 상태)
   let historyMode = "month"; // "month" | "year"
   let sortKey = null; // null | "site_name" | "work_date"
@@ -286,6 +304,10 @@
   // 업무 메모 상태
   let workMemoEntries = [];
   let editingWorkMemoId = null;
+
+  // 민원 일지 상태
+  let complaintEntries = [];
+  let editingComplaintId = null;
 
   // 경리 업무일지 상태
   let accountingEntries = [];
@@ -395,6 +417,7 @@
       history: historyView,
       journal: journalSection,
       workMemos: workMemosSection,
+      complaints: complaintsSection,
       accounting: accountingSection,
       accountingOverview: accountingOverviewSection,
       followup: followupSection,
@@ -414,6 +437,8 @@
       loadJournal();
     } else if (tab === "workMemos") {
       loadWorkMemos();
+    } else if (tab === "complaints") {
+      loadComplaints();
     } else if (tab === "accounting") {
       loadAccounting();
     } else if (tab === "accountingOverview") {
@@ -466,6 +491,8 @@
       if (editingJournalId === null) loadJournal();
     } else if (activeTab === "workMemos") {
       if (editingWorkMemoId === null) loadWorkMemos();
+    } else if (activeTab === "complaints") {
+      if (editingComplaintId === null) loadComplaints();
     } else if (activeTab === "accounting") {
       if (editingAccountingId === null) loadAccounting();
     } else if (activeTab === "accountingOverview") {
@@ -527,6 +554,8 @@
       [newJournalSite, pickOpts],
       [workMemoFilterSite, filterOpts],
       [newWorkMemoSite, pickOpts],
+      [complaintFilterSite, filterOpts],
+      [newComplaintSite, pickOpts],
       [accountingFilterSite, filterOpts],
       [newAccountingSite, pickOpts],
       [acctOverviewFilterSite, filterOpts],
@@ -1908,6 +1937,213 @@
       try {
         await api(`/api/work-memos/${id}`, { method: "PUT", body: JSON.stringify({ done: e.target.checked }) });
         await loadWorkMemos();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  // ================= 민원 일지 (작업일 / 현장명 / 내용 / 처리결과 / 완료 — 월별 그룹핑, 완료는 아래로) =================
+  // 경리 업무일지와 비슷한 구성이지만 마감기한 대신 "처리결과"를 기록하고, 완료 항목은
+  // (경리 업무일지·업무 메모처럼 위가 아니라) "작업 내역"/"작업 히스토리" 탭과 같은 방식으로
+  // 각 월 그룹의 맨 아래로 정렬됩니다. 자동 이월・지난 완료건 숨김 기능은 없음.
+
+  async function loadComplaints() {
+    const params = new URLSearchParams({ sort: "desc" });
+    if (complaintFilterSite.value) params.set("site", complaintFilterSite.value);
+    if (complaintFilterDate.value) params.set("date", complaintFilterDate.value);
+    if (complaintFilterDone.value !== "") params.set("done", complaintFilterDone.value);
+    const data = await api(`/api/complaints?${params.toString()}`);
+    complaintEntries = data.entries;
+    renderComplaints();
+  }
+
+  complaintFilterSite.addEventListener("change", loadComplaints);
+  complaintFilterDate.addEventListener("change", loadComplaints);
+  complaintFilterDone.addEventListener("change", loadComplaints);
+  complaintFilterResetBtn.addEventListener("click", () => {
+    complaintFilterSite.value = "";
+    complaintFilterDate.value = "";
+    complaintFilterDone.value = "";
+    loadComplaints();
+  });
+
+  addComplaintBtn.addEventListener("click", () => {
+    complaintAddError.textContent = "";
+    complaintAddForm.classList.toggle("hidden");
+    if (!complaintAddForm.classList.contains("hidden") && !newComplaintDate.value) {
+      newComplaintDate.value = todayStr();
+    }
+  });
+  cancelComplaintBtn.addEventListener("click", () => {
+    complaintAddForm.classList.add("hidden");
+    resetComplaintAddForm();
+  });
+
+  function resetComplaintAddForm() {
+    newComplaintDate.value = todayStr();
+    newComplaintSite.value = "";
+    newComplaintContent.value = "";
+    newComplaintResult.value = "";
+    newComplaintDone.checked = false;
+    complaintAddError.textContent = "";
+  }
+
+  saveComplaintBtn.addEventListener("click", async () => {
+    complaintAddError.textContent = "";
+    if (!newComplaintSite.value) { complaintAddError.textContent = "현장을 선택해주세요."; return; }
+    if (!newComplaintDate.value) { complaintAddError.textContent = "작업일을 선택해주세요."; return; }
+    if (!newComplaintContent.value.trim()) { complaintAddError.textContent = "내용을 입력해주세요."; return; }
+    try {
+      await api("/api/complaints", {
+        method: "POST",
+        body: JSON.stringify({
+          work_date: newComplaintDate.value,
+          site_name: newComplaintSite.value,
+          content: newComplaintContent.value,
+          result: newComplaintResult.value,
+          done: newComplaintDone.checked,
+        }),
+      });
+      complaintAddForm.classList.add("hidden");
+      resetComplaintAddForm();
+      await loadComplaints();
+    } catch (err) {
+      complaintAddError.textContent = err.message;
+    }
+  });
+
+  function renderComplaints() {
+    if (complaintEntries.length === 0) {
+      complaintBody.innerHTML = "";
+      complaintEmptyMsg.classList.remove("hidden");
+      return;
+    }
+    complaintEmptyMsg.classList.add("hidden");
+
+    // 작업일 기준 월별로 묶고, 월 그룹은 최신 달이 먼저 오도록(내림차순) 정렬합니다.
+    // ("작업일 미상" 그룹은 항상 맨 뒤)
+    const groups = new Map();
+    complaintEntries.forEach((r) => {
+      const key = recordMonthKey(r);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    });
+    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+      if (a === b) return 0;
+      if (a === "") return 1;
+      if (b === "") return -1;
+      return a < b ? 1 : -1;
+    });
+
+    // 그룹 안에서 최신 작업일이 먼저 오도록 정렬(같으면 id 최신순).
+    const cmp = (a, b) => {
+      const av = a.work_date || a.created_at || "";
+      const bv = b.work_date || b.created_at || "";
+      if (av !== bv) return av < bv ? 1 : -1;
+      return b.id - a.id;
+    };
+
+    const parts = [];
+    sortedKeys.forEach((key) => {
+      const group = groups.get(key);
+      // 같은 월 안에서는 미완료 항목을 먼저, 완료 항목은 아래로 배치합니다.
+      const undone = group.filter((r) => !r.done).sort(cmp);
+      const done = group.filter((r) => r.done).sort(cmp);
+      parts.push(`<tr class="record-month-header"><td colspan="6">${escapeHtml(recordMonthLabel(key))}</td></tr>`);
+      [...undone, ...done].forEach((r) => {
+        parts.push(editingComplaintId === r.id ? complaintEditRowHtml(r) : complaintViewRowHtml(r));
+      });
+    });
+    complaintBody.innerHTML = parts.join("");
+  }
+
+  function complaintViewRowHtml(r) {
+    return `
+      <tr class="${r.done ? "paid-row" : ""}" data-id="${r.id}">
+        <td class="col-date" data-label="작업일"><span class="cell-value">${escapeHtml(r.work_date) || "-"}</span></td>
+        <td class="site-badge" data-label="현장명"><span class="cell-value">${escapeHtml(r.site_name)}</span></td>
+        <td class="col-content" data-label="내용"><span class="cell-value">${escapeHtml(r.content) || "-"}</span></td>
+        <td class="col-content" data-label="처리결과"><span class="cell-value">${escapeHtml(r.result) || "-"}</span></td>
+        <td class="col-check" data-label="완료">
+          <span class="cell-value">${toggleChipHtml("toggle-complaint-done", r.id, r.done)}</span>
+        </td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-ghost btn-sm" data-action="edit-complaint" data-id="${r.id}">수정</button>
+            <button class="btn btn-danger btn-sm" data-action="delete-complaint" data-id="${r.id}">삭제</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  function complaintEditRowHtml(r) {
+    const siteOpts = sites
+      .map((s) => `<option value="${escapeHtml(s.name)}" ${s.name === r.site_name ? "selected" : ""}>${escapeHtml(s.name)}</option>`)
+      .join("");
+    return `
+      <tr data-id="${r.id}">
+        <td class="col-date" data-label="작업일"><input class="edit-input" type="date" data-edit="work_date" value="${r.work_date || ""}" /></td>
+        <td data-label="현장명"><select class="edit-input" data-edit="site_name">${siteOpts}</select></td>
+        <td data-label="내용"><input class="edit-input" data-edit="content" value="${escapeHtml(r.content)}" /></td>
+        <td data-label="처리결과"><input class="edit-input" data-edit="result" value="${escapeHtml(r.result)}" /></td>
+        <td class="col-check" data-label="완료">
+          <span class="cell-value">${toggleChipEditHtml("done", r.done)}</span>
+        </td>
+        <td class="col-manage" data-label="관리">
+          <span class="row-actions">
+            <button class="btn btn-primary btn-sm" data-action="save-edit-complaint" data-id="${r.id}">저장</button>
+            <button class="btn btn-ghost btn-sm" data-action="cancel-edit-complaint" data-id="${r.id}">취소</button>
+          </span>
+        </td>
+      </tr>`;
+  }
+
+  complaintBody.addEventListener("click", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (!action || !id) return;
+
+    if (action === "edit-complaint") {
+      editingComplaintId = Number(id);
+      renderComplaints();
+    } else if (action === "cancel-edit-complaint") {
+      editingComplaintId = null;
+      renderComplaints();
+    } else if (action === "save-edit-complaint") {
+      const row = e.target.closest("tr");
+      const patch = {
+        work_date: row.querySelector('[data-edit="work_date"]').value || null,
+        site_name: row.querySelector('[data-edit="site_name"]').value,
+        content: row.querySelector('[data-edit="content"]').value,
+        result: row.querySelector('[data-edit="result"]').value,
+        done: row.querySelector('[data-edit="done"]').checked,
+      };
+      try {
+        await api(`/api/complaints/${id}`, { method: "PUT", body: JSON.stringify(patch) });
+        editingComplaintId = null;
+        await loadComplaints();
+      } catch (err) {
+        alert(err.message);
+      }
+    } else if (action === "delete-complaint") {
+      if (!confirm("이 민원 일지를 삭제할까요?")) return;
+      try {
+        await api(`/api/complaints/${id}`, { method: "DELETE" });
+        await loadComplaints();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  });
+
+  complaintBody.addEventListener("change", async (e) => {
+    const action = e.target.getAttribute("data-action");
+    const id = e.target.getAttribute("data-id");
+    if (action === "toggle-complaint-done" && id) {
+      try {
+        await api(`/api/complaints/${id}`, { method: "PUT", body: JSON.stringify({ done: e.target.checked }) });
+        await loadComplaints();
       } catch (err) {
         alert(err.message);
       }

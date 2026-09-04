@@ -998,6 +998,137 @@ async function handleDeleteWorkMemo(id, env) {
   return json({ ok: true });
 }
 
+// ---- 민원 일지 (complaint_logs) ----
+// 경리 업무일지와 같은 형태이나 마감기한 없이 "작업일 / 현장명 / 내용 / 처리결과 / 완료"만
+// 기록하는 표입니다. 자동 이월・지난 완료건 숨김 기능은 없고, 완료된 내역도 항상 이
+// 화면에서 그대로 조회할 수 있습니다(화면에서 월별로 그룹핑해서 보여줌).
+
+function rowToComplaintLog(row) {
+  return {
+    id: row.id,
+    work_date: row.work_date,
+    site_name: row.site_name,
+    content: row.content || "",
+    result: row.result || "",
+    done: !!row.done,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function handleGetComplaintLogs(request, env) {
+  const url = new URL(request.url);
+  const site = url.searchParams.get("site") || "";
+  const date = url.searchParams.get("date") || "";    // YYYY-MM-DD (특정 하루)
+  const from = url.searchParams.get("from") || "";     // YYYY-MM-DD
+  const to = url.searchParams.get("to") || "";         // YYYY-MM-DD
+  const done = url.searchParams.get("done") || "";     // "0" | "1" | ""
+  const keyword = url.searchParams.get("keyword") || "";
+  const sort = url.searchParams.get("sort") === "asc" ? "ASC" : "DESC";
+
+  let query = "SELECT * FROM complaint_logs WHERE 1=1";
+  const binds = [];
+  if (site) {
+    query += " AND site_name = ?";
+    binds.push(site);
+  }
+  if (date) {
+    query += " AND work_date = ?";
+    binds.push(date);
+  } else {
+    if (from) {
+      query += " AND work_date >= ?";
+      binds.push(from);
+    }
+    if (to) {
+      query += " AND work_date <= ?";
+      binds.push(to);
+    }
+  }
+  if (done === "0" || done === "1") {
+    query += " AND done = ?";
+    binds.push(Number(done));
+  }
+  if (keyword) {
+    query += " AND (site_name LIKE ? OR content LIKE ? OR result LIKE ?)";
+    const k = `%${keyword}%`;
+    binds.push(k, k, k);
+  }
+  query += ` ORDER BY work_date ${sort}, id ASC`;
+
+  const stmt = env.DB.prepare(query).bind(...binds);
+  const { results } = await stmt.all();
+  return json({ entries: results.map(rowToComplaintLog) });
+}
+
+async function handleCreateComplaintLog(request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+  const site_name = typeof body.site_name === "string" ? body.site_name.trim() : "";
+  const work_date = typeof body.work_date === "string" && body.work_date ? body.work_date : "";
+  const content = typeof body.content === "string" ? body.content.trim() : "";
+  const result_text = typeof body.result === "string" ? body.result.trim() : "";
+  const done = toBool(body.done) ? 1 : 0;
+
+  if (!site_name) return badRequest("현장을 선택해주세요.");
+  if (!work_date) return badRequest("작업일을 선택해주세요.");
+  if (!content) return badRequest("내용을 입력해주세요.");
+
+  const result = await env.DB.prepare(
+    `INSERT INTO complaint_logs (work_date, site_name, content, result, done, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+  )
+    .bind(work_date, site_name, content, result_text, done)
+    .run();
+
+  return json({ ok: true, id: result.meta.last_row_id });
+}
+
+async function handleUpdateComplaintLog(id, request, env) {
+  const body = await readJson(request);
+  if (!body) return badRequest("요청 본문이 올바르지 않습니다.");
+
+  const fields = [];
+  const binds = [];
+
+  if (typeof body.site_name === "string") {
+    fields.push("site_name = ?");
+    binds.push(body.site_name.trim());
+  }
+  if (body.work_date !== undefined) {
+    fields.push("work_date = ?");
+    binds.push(body.work_date || "");
+  }
+  if (typeof body.content === "string") {
+    fields.push("content = ?");
+    binds.push(body.content.trim());
+  }
+  if (typeof body.result === "string") {
+    fields.push("result = ?");
+    binds.push(body.result.trim());
+  }
+  if (body.done !== undefined) {
+    fields.push("done = ?");
+    binds.push(toBool(body.done) ? 1 : 0);
+  }
+
+  if (fields.length === 0) return badRequest("수정할 내용이 없습니다.");
+
+  fields.push("updated_at = datetime('now')");
+  binds.push(id);
+
+  await env.DB.prepare(`UPDATE complaint_logs SET ${fields.join(", ")} WHERE id = ?`)
+    .bind(...binds)
+    .run();
+
+  return json({ ok: true });
+}
+
+async function handleDeleteComplaintLog(id, env) {
+  await env.DB.prepare("DELETE FROM complaint_logs WHERE id = ?").bind(id).run();
+  return json({ ok: true });
+}
+
 // ---- 현장별 1년 스케줄표 (site_schedules) ----
 // 보험 만기, 법정 점검, 소독, 저수조청소 등 현장별로 반복되는 일정(만기 도래일 기준)을
 // 관리합니다. 만기 도래일은 화면에서 언제든 직접 입력/수정할 수 있습니다.
@@ -1382,6 +1513,20 @@ export default {
       }
       if (workMemoMatch && method === "DELETE") {
         return await handleDeleteWorkMemo(Number(workMemoMatch[1]), env);
+      }
+
+      if (path === "/api/complaints" && method === "GET") {
+        return await handleGetComplaintLogs(request, env);
+      }
+      if (path === "/api/complaints" && method === "POST") {
+        return await handleCreateComplaintLog(request, env);
+      }
+      const complaintMatch = path.match(/^\/api\/complaints\/(\d+)$/);
+      if (complaintMatch && method === "PUT") {
+        return await handleUpdateComplaintLog(Number(complaintMatch[1]), request, env);
+      }
+      if (complaintMatch && method === "DELETE") {
+        return await handleDeleteComplaintLog(Number(complaintMatch[1]), env);
       }
 
       if (path === "/api/site-schedules" && method === "GET") {

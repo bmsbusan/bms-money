@@ -56,6 +56,7 @@
       <button class="tab-btn" data-tab="journal">시설 업무일지</button>
       <button class="tab-btn" data-tab="overview">작업 내역 및 시설 업무일지 조회</button>
       <button class="tab-btn" data-tab="workMemos">업무 메모</button>
+      <button class="tab-btn" data-tab="complaints">민원 일지</button>
       <button class="tab-btn" data-tab="accounting">경리 업무일지</button>
       <button class="tab-btn" data-tab="accountingOverview">경리 업무일지 조회</button>
       <button class="tab-btn" data-tab="followup">후속 작업</button>
@@ -342,6 +343,64 @@
           <tbody id="workMemoBody"></tbody>
         </table>
         <p id="workMemoEmptyMsg" class="empty-msg hidden">등록된 업무 메모가 없습니다.</p>
+      </section>
+    </div>
+
+    <!-- 민원 일지 화면 (작업일 / 현장명 / 내용 / 처리결과 / 완료 — 월별 그룹핑, 완료 내역은 아래로) -->
+    <div id="complaintsSection" class="hidden">
+      <section class="toolbar">
+        <div class="filters">
+          <select id="complaintFilterSite">
+            <option value="">전체 현장</option>
+          </select>
+          <input id="complaintFilterDate" type="date" title="특정 날짜만 보기" />
+          <select id="complaintFilterDone">
+            <option value="">전체 상태</option>
+            <option value="0">미완료</option>
+            <option value="1">완료</option>
+          </select>
+          <button id="complaintFilterResetBtn" class="btn btn-ghost">초기화</button>
+        </div>
+        <button id="addComplaintBtn" class="btn btn-primary">+ 새 민원 추가</button>
+      </section>
+
+      <section id="complaintAddForm" class="add-form hidden">
+        <div class="add-form-grid">
+          <label class="field-label">작업일
+            <input id="newComplaintDate" type="date" required />
+          </label>
+          <select id="newComplaintSite" required>
+            <option value="">현장 선택</option>
+          </select>
+          <input id="newComplaintContent" type="text" placeholder="민원 내용 입력" />
+          <input id="newComplaintResult" type="text" placeholder="처리결과 입력" />
+          <label class="toggle-chip toggle-chip-static">
+            <input id="newComplaintDone" type="checkbox" />
+            <span class="toggle-chip-face"><span class="toggle-chip-box"></span>완료</span>
+          </label>
+        </div>
+        <div class="add-form-actions">
+          <button id="saveComplaintBtn" class="btn btn-primary">저장</button>
+          <button id="cancelComplaintBtn" class="btn btn-ghost">취소</button>
+        </div>
+        <p id="complaintAddError" class="error-msg"></p>
+      </section>
+
+      <section class="table-wrap">
+        <table id="complaintTable">
+          <thead>
+            <tr>
+              <th class="col-date">작업일</th>
+              <th class="col-site">현장명</th>
+              <th class="col-content">내용</th>
+              <th class="col-content">처리결과</th>
+              <th class="col-check">완료</th>
+              <th class="col-manage">관리</th>
+            </tr>
+          </thead>
+          <tbody id="complaintBody"></tbody>
+        </table>
+        <p id="complaintEmptyMsg" class="empty-msg hidden">등록된 민원 일지가 없습니다.</p>
       </section>
     </div>
 
